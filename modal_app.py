@@ -44,7 +44,7 @@ CPU_PRICE_PER_CORE = 0.0000131
 MEMORY_PRICE_PER_GIB = 0.00000222
 
 # The GPU with the most environment steps per dollar in results/gpu_benchmark.json.
-TRAIN_GPU = "L40S"
+TRAIN_GPU = "L4"
 
 image = (
     modal.Image.from_registry(

@@ -1,0 +1,63 @@
+{
+  "command": "uv run modal run modal_app.py::bench --iterations 300 --num-envs 4096 --gpus L4,A10,L40S",
+  "date": "2026-11-21T21:29:15+00:00",
+  "task": "Mjlab-Velocity-Flat-Unitree-Go1",
+  "price_note": "list prices from modal.com/pricing on 2026-11-21, for one GPU plus 4 reserved CPU cores and 16 GiB of memory; job_cost_usd leaves out container start-up time",
+  "results": {
+    "L4": {
+      "task": "Mjlab-Velocity-Flat-Unitree-Go1",
+      "num_envs": 4096,
+      "device": "cuda:0",
+      "iterations_requested": 300,
+      "iterations_done": 300,
+      "iterations_timed": 280,
+      "steps_per_iteration": 98304,
+      "env_steps_per_second": 86555.92808441169,
+      "setup_seconds": 77.515361512,
+      "total_seconds": 420.877598032,
+      "gpu": "L4",
+      "gpu_name": "NVIDIA L4",
+      "price_per_second": 0.00030992,
+      "price_per_hour": 1.115712,
+      "env_steps_per_dollar": 279284744.72254676,
+      "job_cost_usd": 0.13043838518207743
+    },
+    "A10": {
+      "task": "Mjlab-Velocity-Flat-Unitree-Go1",
+      "num_envs": 4096,
+      "device": "cuda:0",
+      "iterations_requested": 300,
+      "iterations_done": 300,
+      "iterations_timed": 280,
+      "steps_per_iteration": 98304,
+      "env_steps_per_second": 95915.76072996829,
+      "setup_seconds": 67.114953518,
+      "total_seconds": 376.409721341,
+      "gpu": "A10",
+      "gpu_name": "NVIDIA A10G",
+      "price_per_second": 0.00039392,
+      "price_per_hour": 1.418112,
+      "env_steps_per_dollar": 243490456.76779112,
+      "job_cost_usd": 0.14827531743064673
+    },
+    "L40S": {
+      "task": "Mjlab-Velocity-Flat-Unitree-Go1",
+      "num_envs": 4096,
+      "device": "cuda:0",
+      "iterations_requested": 300,
+      "iterations_done": 300,
+      "iterations_timed": 280,
+      "steps_per_iteration": 98304,
+      "env_steps_per_second": 157024.69210850942,
+      "setup_seconds": 54.935067702000005,
+      "total_seconds": 244.389847522,
+      "gpu": "L40S",
+      "gpu_name": "NVIDIA L40S",
+      "price_per_second": 0.00062992,
+      "price_per_hour": 2.267712,
+      "env_steps_per_dollar": 249277197.2766533,
+      "job_cost_usd": 0.15394605275105822
+    }
+  },
+  "most_steps_per_dollar": "L4"
+}
