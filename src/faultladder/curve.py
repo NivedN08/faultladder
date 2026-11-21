@@ -51,19 +51,34 @@ def plateau(
     return None
 
 
+def smooth(values: list[float], window: int = FINAL_WINDOW) -> list[float]:
+    """Trailing mean of ``values`` over up to ``window`` entries."""
+    out: list[float] = []
+    total = 0.0
+    for index, value in enumerate(values):
+        total += value
+        if index >= window:
+            total -= values[index - window]
+        out.append(total / min(index + 1, window))
+    return out
+
+
 def summarize(log_dir: str | Path) -> dict[str, Any]:
     values = read_scalar(log_dir)
     tail = values[-FINAL_WINDOW:]
-    start = plateau(values)
+    start = plateau(smooth(values))
     return {
         "tag": REWARD_TAG,
         "iterations_logged": len(values),
         "final_mean_reward": sum(tail) / len(tail),
         "plateau_iteration": start,
         "iteration_budget": None if start is None else math.ceil(1.2 * start),
-        "rule": "first iteration from which mean reward stays within 2% of the "
-        f"mean of the last {FINAL_WINDOW} iterations for 500 iterations; "
-        "the budget is 1.2 times that",
+        "plateau_iteration_unsmoothed": plateau(values),
+        "rule": "first iteration from which the trailing "
+        f"{FINAL_WINDOW}-iteration mean of mean reward stays within 2% of the "
+        f"mean of the last {FINAL_WINDOW} iterations for 500 iterations; the "
+        "budget is 1.2 times that. Unsmoothed, single noisy iterations leave "
+        "the 2% band and reset the count.",
         "reward_every_250": [round(value, 3) for value in values[::250]],
     }
 

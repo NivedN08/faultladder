@@ -108,7 +108,9 @@ A phase never borrows from another.
 4. Cancel a training run with no reward improvement after 20% of its
    iterations.
 5. Do not poll a running job in a loop.
-6. Volume `faultladder-runs` at `/runs` holds checkpoints (every 100
+6. Launch, resume, fetch and render with the `modal-train` skill. Train on an
+   L4 for 1,320 iterations unless a result in `results/` says otherwise.
+7. Volume `faultladder-runs` at `/runs` holds checkpoints (every 100
    iterations), TensorBoard logs, videos and result JSON. Set `MUJOCO_GL=egl`
    and `WANDB_MODE=disabled`.
 

@@ -1,0 +1,23 @@
+{
+  "tag": "Train/mean_reward",
+  "iterations_logged": 3000,
+  "final_mean_reward": 94.21629150390625,
+  "plateau_iteration": 1100,
+  "iteration_budget": 1320,
+  "plateau_iteration_unsmoothed": null,
+  "rule": "first iteration from which the trailing 100-iteration mean of mean reward stays within 2% of the mean of the last 100 iterations for 500 iterations; the budget is 1.2 times that. Unsmoothed, single noisy iterations leave the 2% band and reset the count.",
+  "reward_every_250": [
+    -0.12,
+    70.217,
+    87.495,
+    90.749,
+    92.674,
+    92.781,
+    92.637,
+    93.223,
+    94.26,
+    93.435,
+    93.91,
+    94.505
+  ]
+}

@@ -1,5 +1,6 @@
 """The Modal app's pins and cost settings, checked without starting a job."""
 
+import json
 import tomllib
 from pathlib import Path
 
@@ -32,3 +33,8 @@ def test_price_includes_gpu_cpu_and_memory() -> None:
     assert price == pytest.approx(0.000542 + 4 * 0.0000131 + 16 * 0.00000222)
     assert modal_app.TRAIN_GPU in modal_app.GPU_PRICE
     assert max(modal_app.GPU_PRICE.values()) == modal_app.GPU_PRICE["L40S"]
+
+
+def test_iteration_budget_matches_the_recorded_curve() -> None:
+    curve = json.loads((ROOT / "results/go1_baseline_curve.json").read_text())
+    assert curve["iteration_budget"] == modal_app.ITERATION_BUDGET

@@ -34,3 +34,7 @@ def test_read_scalar_merges_resumed_logs(tmp_path: Path) -> None:
     assert values[:2] == [1.0, 2.0]
     assert values[3] == 40.0
     assert values[2] in (3.0, 30.0)
+
+
+def test_smooth_is_a_trailing_mean() -> None:
+    assert curve.smooth([2.0, 4.0, 6.0, 8.0], window=2) == [2.0, 3.0, 5.0, 7.0]

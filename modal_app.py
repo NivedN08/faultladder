@@ -4,7 +4,7 @@ Each command below starts paid GPU time. Run the local checks first
 (``./scripts/check.sh``).
 
     uv run modal run modal_app.py::bench
-    uv run modal run --detach modal_app.py::train --seed 0 --iterations 3000
+    uv run modal run --detach modal_app.py::train --seed 0
     uv run modal run modal_app.py::render --run Mjlab-Velocity-Flat-Unitree-Go1/seed0
     uv run modal volume get faultladder-runs <path on the volume> <local path>
 """
@@ -45,6 +45,10 @@ MEMORY_PRICE_PER_GIB = 0.00000222
 
 # The GPU with the most environment steps per dollar in results/gpu_benchmark.json.
 TRAIN_GPU = "L4"
+
+# 1.2 times the iteration where the seed-0 baseline's reward levelled off; see
+# results/go1_baseline_curve.json.
+ITERATION_BUDGET = 1320
 
 image = (
     modal.Image.from_registry(
@@ -107,7 +111,7 @@ def benchmark_l40s(iterations: int = 300, num_envs: int = NUM_ENVS) -> dict:
 def train(
     task: str = BASE_TASK,
     seed: int = 0,
-    iterations: int = 3000,
+    iterations: int = ITERATION_BUDGET,
     num_envs: int = NUM_ENVS,
 ) -> dict:
     """Train one policy. Restarts resume from the newest checkpoint."""
