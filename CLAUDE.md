@@ -17,6 +17,8 @@ uv run pytest -m "not gpu"        # tests only
 uv run pytest -m "not gpu and not slow"   # fast loop
 uv run python -m faultladder.smoke --agent zero --num-envs 16   # mjlab smoke
 uv run list-envs                  # mjlab's registered tasks
+uv run python -m faultladder.checks               # reacher: dummy agents, oracle
+uv run python -m faultladder.reacher.train        # reacher PPO, about 3 min
 ```
 
 ## Pinned versions
@@ -66,6 +68,10 @@ Differences from the original plan:
   the cache.
 - MuJoCo Warp is not deterministic even with a fixed seed. Determinism tests
   run against CPU MuJoCo.
+- MuJoCo XML angles are degrees unless the file sets
+  `<compiler angle="radian"/>`.
+- PPO needs observations on a common scale: on the reacher it reached 0.69
+  success without `VecNormalize` and 0.99 with it.
 - In mjlab, XML `<option>` flags are ignored, and contact sensors miss brief
   contacts when decimation is above 1.
 
