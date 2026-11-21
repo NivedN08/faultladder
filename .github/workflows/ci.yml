@@ -15,6 +15,10 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # mjlab defaults MUJOCO_GL to egl on Linux, and mujoco then loads libEGL
+      # at import. The runner has no EGL and these tests never render.
+      MUJOCO_GL: disable
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
