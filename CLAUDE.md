@@ -33,6 +33,11 @@ Differences from the original plan:
   `uv run play <task> --agent zero` opens a viewer and never exits.
 - ffmpeg is not installed with Homebrew: mjlab depends on `imageio-ffmpeg`,
   which bundles a binary.
+- `mjviser` is bounded below 0.0.17. That release depends on `mujoco-core` 4.x,
+  which installs into the same `mujoco/` directory as mujoco 3.11 and corrupts
+  it. Exactly one of `mujoco` and `mujoco-core` may appear in `uv.lock`; the
+  Modal image needs the same bound.
+- CI sets `MUJOCO_GL=disable`: the runner has no EGL and CI tests do not render.
 
 ## Facts checked against the installed libraries
 

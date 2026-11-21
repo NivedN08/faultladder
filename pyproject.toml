@@ -12,6 +12,10 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "mjlab==1.6.0",
     "mujoco==3.11.0",
+    # mjviser 0.0.17 depends on mujoco-core 4.x, which installs into the same
+    # mujoco/ directory as mujoco 3.11 and corrupts it. mjlab 1.6.1 adds this
+    # same bound; drop it here once mjlab is upgraded.
+    "mjviser>=0.0.14,<0.0.17",
     "warp-lang==1.17.0",
     "torch==2.14.0",
     "rsl-rl-lib==5.4.2",
