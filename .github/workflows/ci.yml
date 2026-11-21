@@ -20,8 +20,5 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-      - run: uv sync --locked --all-extras
-      - run: uv run ruff format --check
-      - run: uv run ruff check
-      - run: uv run pyright
-      - run: uv run pytest -m "not gpu"
+      # The same script developers run locally; keep every check in it.
+      - run: ./scripts/check.sh

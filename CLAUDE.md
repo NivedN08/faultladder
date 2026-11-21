@@ -12,7 +12,8 @@ Always use `uv run`, never bare `python` (and never the Anaconda Python).
 uv sync --all-extras              # install; the lockfile is CPU-only
 uv run ruff format && uv run ruff check --fix
 uv run pyright
-uv run pytest -m "not gpu"        # what CI runs
+./scripts/check.sh                # exactly what CI runs; run before every push
+uv run pytest -m "not gpu"        # tests only
 uv run pytest -m "not gpu and not slow"   # fast loop
 uv run python -m faultladder.smoke --agent zero --num-envs 16   # mjlab smoke
 uv run list-envs                  # mjlab's registered tasks
@@ -33,6 +34,28 @@ Differences from the original plan:
   `uv run play <task> --agent zero` opens a viewer and never exits.
 - ffmpeg is not installed with Homebrew: mjlab depends on `imageio-ffmpeg`,
   which bundles a binary.
+- `mjviser` is bounded below 0.0.17. That release depends on `mujoco-core` 4.x,
+  which installs into the same `mujoco/` directory as mujoco 3.11 and corrupts
+  it. Exactly one of `mujoco` and `mujoco-core` may appear in `uv.lock`; the
+  Modal image needs the same bound.
+- `scripts/check.sh` sets `MUJOCO_GL=disable`: the CI runner has no EGL and
+  these checks do not render.
+
+## Keeping CI green
+
+1. Run `./scripts/check.sh` before every push. CI runs that same file, so add
+   new checks there, never as separate steps in `ci.yml`.
+2. After any change to `pyproject.toml` or `uv.lock`, read the `uv lock` output
+   for packages that were added or changed version, and run
+   `uv run pytest tests/test_install_integrity.py`. A package that appears
+   unasked is a transitive dependency moving; bound it in `pyproject.toml`.
+3. Never run `uv lock --upgrade` as part of other work. Upgrade one package at
+   a time in its own pull request.
+4. Change `main` only through a pull request, and merge only after reading the
+   result with `gh pr checks <number>`. A check count of zero right after a
+   push means the run has not registered yet, not that there is no CI.
+5. A check that passes on one run and fails on another for the same commit is
+   a real bug (install order, timing), not noise. Find the cause.
 
 ## Facts checked against the installed libraries
 
