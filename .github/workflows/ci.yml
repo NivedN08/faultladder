@@ -15,17 +15,10 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      # mjlab defaults MUJOCO_GL to egl on Linux, and mujoco then loads libEGL
-      # at import. The runner has no EGL and these tests never render.
-      MUJOCO_GL: disable
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-      - run: uv sync --locked --all-extras
-      - run: uv run ruff format --check
-      - run: uv run ruff check
-      - run: uv run pyright
-      - run: uv run pytest -m "not gpu"
+      # The same script developers run locally; keep every check in it.
+      - run: ./scripts/check.sh
