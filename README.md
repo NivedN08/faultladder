@@ -2,8 +2,11 @@
 
 A held-out robustness benchmark for quadruped walking policies.
 
-**Status: planning. No code has been written yet.** Everything below describes
-what the project intends to build; none of it has been implemented or measured.
+**Status: early. The benchmark itself does not exist yet.** So far the repository
+holds the project setup and a small practice environment (a two-joint arm,
+`src/faultladder/reacher`) with its checks; its numbers are in
+`results/reacher.json`. Everything below describes what the project intends to
+build; none of it has been implemented or measured.
 
 ## The idea
 

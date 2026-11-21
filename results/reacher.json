@@ -1,0 +1,88 @@
+{
+  "zero": {
+    "episodes": 1000,
+    "seed": 0,
+    "success_rate": 0.007,
+    "mean_return": -36.35390840999033,
+    "mean_length": 198.67,
+    "command": "uv run python -m faultladder.checks --episodes 1000 --seed 0 --out results/reacher.json"
+  },
+  "gate": {
+    "checks": {
+      "oracle": {
+        "success_rate": 1.0,
+        "condition": ">= 0.95",
+        "passed": true
+      },
+      "ppo": {
+        "success_rate": 0.987,
+        "condition": ">= 0.9",
+        "passed": true
+      },
+      "random": {
+        "success_rate": 0.0,
+        "condition": "<= 0.05",
+        "passed": true
+      },
+      "zero": {
+        "success_rate": 0.007,
+        "condition": "<= 0.05",
+        "passed": true
+      },
+      "ppo_target_hidden": {
+        "success_rate": 0.0,
+        "condition": "<= 0.1",
+        "passed": true
+      }
+    },
+    "passed": true
+  },
+  "random": {
+    "episodes": 1000,
+    "seed": 0,
+    "success_rate": 0.0,
+    "mean_return": -39.12295722017182,
+    "mean_length": 200.0,
+    "command": "uv run python -m faultladder.checks --episodes 1000 --seed 0 --out results/reacher.json"
+  },
+  "oracle": {
+    "episodes": 1000,
+    "seed": 0,
+    "success_rate": 1.0,
+    "mean_return": -4.390840666724886,
+    "mean_length": 56.254,
+    "command": "uv run python -m faultladder.checks --episodes 1000 --seed 0 --out results/reacher.json"
+  },
+  "determinism": {
+    "steps": 200,
+    "max_abs_difference": 0.0,
+    "command": "uv run python -m faultladder.checks --episodes 1000 --seed 0 --out results/reacher.json"
+  },
+  "speed": {
+    "steps": 20000,
+    "steps_per_second": 35790.855264725185,
+    "command": "uv run python -m faultladder.checks --episodes 1000 --seed 0 --out results/reacher.json"
+  },
+  "ppo": {
+    "episodes": 1000,
+    "seed": 0,
+    "success_rate": 0.987,
+    "mean_return": -4.971203906703267,
+    "mean_length": 64.672,
+    "train_steps": 1000000,
+    "num_envs": 8,
+    "train_seconds": 170.8,
+    "command": "uv run python -m faultladder.reacher.train --steps 1000000 --num-envs 8 --seed 0 --episodes 1000 --out results/reacher.json"
+  },
+  "ppo_target_hidden": {
+    "episodes": 1000,
+    "seed": 0,
+    "success_rate": 0.0,
+    "mean_return": -28.98656957585503,
+    "mean_length": 200.0,
+    "train_steps": 1000000,
+    "num_envs": 8,
+    "train_seconds": 154.6,
+    "command": "uv run python -m faultladder.reacher.train --hide-target --steps 1000000 --num-envs 8 --seed 0 --episodes 1000 --out results/reacher.json"
+  }
+}
