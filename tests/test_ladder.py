@@ -12,11 +12,17 @@ from faultladder.score import AXES
 from faultladder.tasks import EVAL_TASK
 
 NUM_ENVS = 4
-PLAN_LEVELS = {
+LEVELS = {
     "motor_hip": [0.8, 0.6, 0.4, 0.2, 0.0],
     "motor_thigh": [0.8, 0.6, 0.4, 0.2, 0.0],
     "motor_calf": [0.8, 0.6, 0.4, 0.2, 0.0],
-    "payload": [0.1, 0.2, 0.3, 0.4, 0.5],
+    "payload": [
+        0.12,
+        0.24,
+        0.36,
+        0.48,
+        0.6,
+    ],  # calibration round 1; plan had 0.1 to 0.5
     "friction": [0.6, 0.45, 0.3, 0.2, 0.1],
     "latency": [1, 2, 3, 4, 5],
     "push": [0.5, 1.0, 1.5, 2.0, 2.5],
@@ -46,9 +52,9 @@ def _field(env: ManagerBasedRlEnv, field: str) -> torch.Tensor:
     return torch.as_tensor(getattr(env.sim.model, field)[:]).clone()
 
 
-def test_ladder_file_matches_the_plan():
+def test_ladder_file_levels():
     spec = ladder.load()
-    assert {a: spec["axes"][a]["levels"] for a in AXES} == PLAN_LEVELS
+    assert {a: spec["axes"][a]["levels"] for a in AXES} == LEVELS
     all_cells = ladder.cells()
     assert len(all_cells) == 36
     assert all_cells[0].name == "nominal"

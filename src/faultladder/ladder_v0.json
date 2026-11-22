@@ -10,7 +10,7 @@
     "motor_hip": {"unit": "strength fraction", "nominal": 1.0, "levels": [0.8, 0.6, 0.4, 0.2, 0.0]},
     "motor_thigh": {"unit": "strength fraction", "nominal": 1.0, "levels": [0.8, 0.6, 0.4, 0.2, 0.0]},
     "motor_calf": {"unit": "strength fraction", "nominal": 1.0, "levels": [0.8, 0.6, 0.4, 0.2, 0.0]},
-    "payload": {"unit": "added mass / robot mass", "nominal": 0.0, "levels": [0.1, 0.2, 0.3, 0.4, 0.5]},
+    "payload": {"unit": "added mass / robot mass", "nominal": 0.0, "levels": [0.12, 0.24, 0.36, 0.48, 0.6]},
     "friction": {"unit": "foot friction coefficient", "nominal": 1.0, "levels": [0.6, 0.45, 0.3, 0.2, 0.1]},
     "latency": {"unit": "control steps (20 ms)", "nominal": 0, "levels": [1, 2, 3, 4, 5]},
     "push": {"unit": "m/s sideways kick", "nominal": 0.0, "levels": [0.5, 1.0, 1.5, 2.0, 2.5]}
