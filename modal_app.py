@@ -61,6 +61,10 @@ image = (
     .uv_pip_install(*IMAGE_PACKAGES)
     .env({"MUJOCO_GL": "egl", "WANDB_MODE": "disabled"})
     .add_local_python_source("faultladder")
+    # add_local_python_source copies only .py files; the ladder is package data.
+    .add_local_file(
+        "src/faultladder/ladder_v0.json", "/root/faultladder/ladder_v0.json"
+    )
 )
 app = modal.App("faultladder", image=image)
 volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
@@ -149,6 +153,59 @@ def render(
     on_volume = str(video.relative_to(RUNS))
     print(f"video on the {VOLUME_NAME} volume: {on_volume}")
     return on_volume
+
+
+@app.function(gpu=TRAIN_GPU, timeout=60 * MINUTES, volumes={RUNS: volume}, **_job)
+def evaluate(
+    name: str,
+    agent: str = "ppo",
+    run: str = f"{BASE_TASK}/seed0",
+    checkpoint: str = "",
+    seed: int = 0,
+    num_envs: int = 0,
+    only: str = "",
+) -> dict:
+    """Score an agent on the ladder; writes ``eval/<name>/ladder.json``."""
+    from faultladder import baseline
+    from faultladder import evaluate as fl_evaluate
+
+    path = None
+    if agent == "ppo":
+        log_dir = Path(RUNS) / run
+        path = log_dir / checkpoint if checkpoint else baseline.checkpoints(log_dir)[0]
+    report = fl_evaluate.evaluate(
+        agent,
+        Path(RUNS) / "eval" / name,
+        checkpoint=path,
+        num_envs=num_envs or None,
+        device="cuda:0",
+        seed=seed,
+        only=only.split(",") if only else None,
+    )
+    report["gpu"] = TRAIN_GPU
+    report["cost_usd"] = report["wall_seconds"] * price_per_second(TRAIN_GPU)
+    volume.commit()
+    return report
+
+
+@app.local_entrypoint()
+def ladder(
+    name: str,
+    agent: str = "ppo",
+    run: str = f"{BASE_TASK}/seed0",
+    checkpoint: str = "",
+    seed: int = 0,
+    num_envs: int = 0,
+    only: str = "",
+    out: str = "results",
+):
+    """Score an agent on Modal and save ``<out>/<name>/ladder.json`` locally."""
+    report = evaluate.remote(name, agent, run, checkpoint, seed, num_envs, only)
+    path = Path(out) / name / "ladder.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps(report["scores"], indent=2))
+    print(f"wrote {path}; about ${report['cost_usd']:.2f} of GPU time")
 
 
 @app.local_entrypoint()
