@@ -116,6 +116,21 @@ def test_gate_refuses_mixed_ladder_versions(tmp_path):
         check(root)
 
 
+def test_leaderboard_ranks_by_mean_and_refuses_mixed_ladders(tmp_path):
+    root = _results(tmp_path, [1.0, 0.9, 0.8, 0.5, 0.3])
+    for seed in (1, 2):
+        (root / f"ppo_wide_seed{seed}" / "ladder.json").unlink()
+        (root / f"ppo_wide_seed{seed}").rmdir()
+    rows = [line for line in build(root).splitlines() if line.startswith("| PPO")]
+    assert rows[0].startswith("| PPO wide | 1 |")
+    path = root / "ppo_nodr_seed1" / "ladder.json"
+    report = json.loads(path.read_text())
+    report["ladder"] = "v0"
+    path.write_text(json.dumps(report))
+    with pytest.raises(ValueError):
+        build(root)
+
+
 def test_leaderboard_ranks_by_score_and_reports_seed_statistics(tmp_path):
     report = build(_results(tmp_path, [1.0, 0.9, 0.8, 0.5, 0.3]))
     rows = [line for line in report.splitlines() if line.startswith("| PPO")]

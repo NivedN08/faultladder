@@ -33,8 +33,13 @@ def build(results: str | Path) -> str:
     ]
     if not rows:
         raise ValueError(f"no ladder runs under {results}")
-    rows.sort(key=lambda row: -sum(r["scores"]["faultladder"] for r in row[1]))
+    rows.sort(
+        key=lambda row: -sum(r["scores"]["faultladder"] for r in row[1]) / len(row[1])
+    )
     first = rows[0][1][0]
+    protocol = {(r["ladder"], r["episodes_per_cell"]) for _, runs in rows for r in runs}
+    if len(protocol) != 1:
+        raise ValueError(f"the runs differ in ladder or episodes per cell: {protocol}")
     lines = [
         "# FaultLadder leaderboard",
         "",
