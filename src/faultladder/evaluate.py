@@ -117,6 +117,10 @@ def run_episodes(
     else:
         ladder.set_cell(env, *cells)
     wrapped.reset()
+    # A recurrent policy starts each episode with an empty memory.
+    forget = getattr(policy, "reset", None)
+    if forget is not None:
+        forget()
     twist = env.command_manager.get_term("twist")
     assert isinstance(twist, UniformVelocityCommand)
     twist.vel_command_b[:] = commands
@@ -138,6 +142,8 @@ def run_episodes(
         # Episodes never time out here, so a done is a fall. The fallen robot
         # respawns with a new command; it is already a failure.
         fell |= dones.bool()
+        if forget is not None:
+            forget(dones)
         twist.vel_command_b[:] = commands
         if step >= first_scored:
             lin_vel = robot.data.root_link_lin_vel_b[:, :2]

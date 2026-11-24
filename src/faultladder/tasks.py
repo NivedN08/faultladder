@@ -11,6 +11,7 @@ from mjlab.entity import EntityArticulationInfoCfg
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.managers.event_manager import EventTermCfg
 from mjlab.managers.observation_manager import ObservationTermCfg
+from mjlab.rl import RslRlOnPolicyRunnerCfg
 from mjlab.tasks.registry import register_mjlab_task
 from mjlab.tasks.velocity.config.go1.env_cfgs import unitree_go1_flat_env_cfg
 from mjlab.tasks.velocity.config.go1.rl_cfg import unitree_go1_ppo_runner_cfg
@@ -21,6 +22,7 @@ from faultladder import events, ladder
 
 EVAL_TASK = "FaultLadder-Eval-Unitree-Go1"
 EVAL_PRIVILEGED_TASK = "FaultLadder-Eval-Privileged-Unitree-Go1"
+EVAL_RECURRENT_TASK = "FaultLadder-Eval-Recurrent-Unitree-Go1"
 MAX_LATENCY_STEPS = 5
 # Wide randomisation covers the ladder up to this level; 4 and 5 are held out.
 WIDE_LEVEL = 3
@@ -39,6 +41,7 @@ BASELINES = {
     "default": Baseline("FaultLadder-Default-Unitree-Go1", EVAL_TASK),
     "wide": Baseline("FaultLadder-Wide-Unitree-Go1", EVAL_TASK),
     "privileged": Baseline("FaultLadder-Privileged-Unitree-Go1", EVAL_PRIVILEGED_TASK),
+    "recurrent": Baseline("FaultLadder-Recurrent-Unitree-Go1", EVAL_RECURRENT_TASK),
 }
 # Randomisation the base task applies itself; evaluation holds these fixed.
 BASE_RANDOMISATION = (
@@ -180,12 +183,29 @@ def wide_randomisation_env_cfg(
     return cfg
 
 
-def _register(task_id: str, env_cfg, play_env_cfg) -> None:
+def recurrent_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+    """The Go1 PPO settings with an LSTM in front of the actor and the critic.
+
+    A policy with memory can infer a fault from how the robot has responded,
+    which a policy that sees one time step cannot.
+    """
+    cfg = unitree_go1_ppo_runner_cfg()
+    for model in (cfg.actor, cfg.critic):
+        model.class_name = "RNNModel"
+        model.rnn_type = "lstm"
+        model.rnn_hidden_dim = 256
+        model.rnn_num_layers = 1
+    return cfg
+
+
+def _register(
+    task_id: str, env_cfg, play_env_cfg, rl_cfg: RslRlOnPolicyRunnerCfg | None = None
+) -> None:
     register_mjlab_task(
         task_id=task_id,
         env_cfg=env_cfg,
         play_env_cfg=play_env_cfg,
-        rl_cfg=unitree_go1_ppo_runner_cfg(),
+        rl_cfg=rl_cfg or unitree_go1_ppo_runner_cfg(),
         runner_cls=VelocityOnPolicyRunner,
     )
 
@@ -215,4 +235,16 @@ _register(
     BASELINES["privileged"].train_task,
     wide_randomisation_env_cfg(privileged=True),
     wide_randomisation_env_cfg(play=True, privileged=True),
+)
+_register(
+    EVAL_RECURRENT_TASK,
+    faultladder_eval_env_cfg(),
+    faultladder_eval_env_cfg(),
+    recurrent_ppo_runner_cfg(),
+)
+_register(
+    BASELINES["recurrent"].train_task,
+    wide_randomisation_env_cfg(),
+    wide_randomisation_env_cfg(play=True),
+    recurrent_ppo_runner_cfg(),
 )

@@ -15,6 +15,7 @@ BASELINES = {
     "default": "PPO default",
     "wide": "PPO wide",
     "privileged": "PPO privileged",
+    "recurrent": "PPO wide, recurrent",
 }
 COMMANDS = {
     "G1": "uv run modal run modal_app.py::baselines",
