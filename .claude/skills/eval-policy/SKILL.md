@@ -20,9 +20,10 @@ The score has one definition, `faultladder.score`. Never recompute it elsewhere.
    uv run modal run modal_app.py::ladder --name random --agent random
    ```
 
-   Options: `--run <task>/seed<n>` and `--checkpoint model_<n>.pt` pick the
-   policy (default: newest checkpoint of the Go1 seed 0 run), `--seed` changes
-   the commands and randomness, `--only nominal,push/3` runs a subset (then
+   Options: `--baseline nodr|default|wide|privileged` and `--seed` (the
+   training seed) pick the policy, or `--run <task>/seed<n>` and
+   `--checkpoint model_<n>.pt` (default: newest checkpoint of the default
+   baseline, seed 0), `--eval-seed` changes the commands and randomness, `--only nominal,push/3` runs a subset (then
    `scores` is null), `--out` changes the local directory.
 
 3. Small checks on the Mac CPU (no cost). 256 robots for one cell take about

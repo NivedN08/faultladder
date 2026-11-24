@@ -197,8 +197,10 @@ def evaluate(
         task = BASELINES[baseline].eval_task
         run = run or f"{BASELINES[baseline].train_task}/seed{seed}"
         log_dir = Path(RUNS) / run
-        newest = fl_baseline.checkpoints(log_dir)[0]
-        path = log_dir / checkpoint if checkpoint else newest
+        if checkpoint:
+            path = log_dir / checkpoint
+        else:
+            path = fl_baseline.checkpoints(log_dir)[0]
     report = fl_evaluate.evaluate(
         agent,
         Path(RUNS) / "eval" / name,
