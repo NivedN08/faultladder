@@ -153,3 +153,67 @@ def baseline_gates(
         },
     }
     return {"checks": checks, "passed": all(c["passed"] for c in checks.values())}
+
+
+MOTOR_AXES = ("motor_hip", "motor_thigh", "motor_calf")
+
+
+def onset_scores(
+    static: dict[str, list[float]], onset: dict[str, list[float]]
+) -> dict[str, Any]:
+    """Onset track: motor faults that start mid-episode.
+
+    ``static`` and ``onset`` hold the five cell scores of each motor axis with
+    the fault present from the start and appearing mid-episode, scored over
+    the same window. ``onset`` is the track score; ``gap`` is how much a fault
+    costs by arriving while the robot walks.
+    """
+    for scores in (static, onset):
+        if set(scores) != set(MOTOR_AXES):
+            raise ValueError(f"expected axes {MOTOR_AXES}, got {tuple(scores)}")
+        if any(len(levels) != NUM_LEVELS for levels in scores.values()):
+            raise ValueError(f"every axis needs {NUM_LEVELS} levels")
+    axes = {
+        axis: {"static": _mean(static[axis]), "onset": _mean(onset[axis])}
+        for axis in MOTOR_AXES
+    }
+    static_mean = _mean([a["static"] for a in axes.values()])
+    onset_mean = _mean([a["onset"] for a in axes.values()])
+    return {
+        "onset": onset_mean,
+        "static": static_mean,
+        "gap": static_mean - onset_mean,
+        "axes": axes,
+    }
+
+
+def compound_prediction(single_a: float, single_b: float, nominal: float) -> float:
+    """Success expected under two faults if they hurt independently.
+
+    Each fault keeps a fraction ``single / nominal`` of the nominal successes;
+    independent faults keep the product of the two fractions.
+    """
+    if nominal <= 0.0:
+        return 0.0
+    return min(single_a, single_b, single_a * single_b / nominal)
+
+
+def compound_scores(pairs: list[dict[str, float]], nominal: float) -> dict[str, float]:
+    """Compound track: two axes perturbed together.
+
+    Each pair has the ``observed`` success and the two single-fault successes
+    ``single_a`` and ``single_b``. ``compound`` is the track score;
+    ``interaction`` is observed minus predicted, negative when two faults
+    together are worse than their separate effects predict.
+    """
+    if not pairs:
+        raise ValueError("no compound cells")
+    observed = _mean([p["observed"] for p in pairs])
+    predicted = _mean(
+        [compound_prediction(p["single_a"], p["single_b"], nominal) for p in pairs]
+    )
+    return {
+        "compound": observed,
+        "predicted": predicted,
+        "interaction": observed - predicted,
+    }

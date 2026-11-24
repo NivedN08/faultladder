@@ -59,8 +59,12 @@ def cells() -> list[Cell]:
     return out
 
 
-def event_params(cell: Cell) -> dict[str, dict[str, Any]]:
-    """Parameters of every FaultLadder event term for ``cell``."""
+def event_params(*cells: Cell) -> dict[str, dict[str, Any]]:
+    """Parameters of every FaultLadder event term with ``cells`` applied together.
+
+    Cells must be on different axes, and at most one may be a motor axis: the
+    motor event weakens one kind of joint.
+    """
     spec = load()
     params: dict[str, dict[str, Any]] = {
         MOTOR: {"joint_type": None, "strength": 1.0},
@@ -69,27 +73,39 @@ def event_params(cell: Cell) -> dict[str, dict[str, Any]]:
         LATENCY: {"steps": 0},
         PUSH: {"speed": 0.0},
     }
-    if cell.level == 0:
-        return params
-    if cell.axis.startswith("motor_"):
-        params[MOTOR] = {
-            "joint_type": cell.axis.removeprefix("motor_"),
-            "strength": cell.value,
-        }
-    elif cell.axis == "payload":
-        params[PAYLOAD]["mass_fraction"] = cell.value
-    elif cell.axis == "friction":
-        params[FRICTION]["coefficient"] = cell.value
-    elif cell.axis == "latency":
-        params[LATENCY]["steps"] = cell.value
-    elif cell.axis == "push":
-        params[PUSH]["speed"] = cell.value
-    else:
-        raise ValueError(f"unknown axis {cell.axis!r}")
+    used: set[str] = set()
+    for cell in cells:
+        if cell.level == 0:
+            continue
+        if cell.axis.startswith("motor_"):
+            event = MOTOR
+            update = {
+                "joint_type": cell.axis.removeprefix("motor_"),
+                "strength": cell.value,
+            }
+        elif cell.axis == "payload":
+            event, update = PAYLOAD, {"mass_fraction": cell.value}
+        elif cell.axis == "friction":
+            event, update = FRICTION, {"coefficient": cell.value}
+        elif cell.axis == "latency":
+            event, update = LATENCY, {"steps": cell.value}
+        elif cell.axis == "push":
+            event, update = PUSH, {"speed": cell.value}
+        else:
+            raise ValueError(f"unknown axis {cell.axis!r}")
+        if event in used:
+            raise ValueError(f"two cells change {event}: {[c.name for c in cells]}")
+        used.add(event)
+        params[event].update(update)
     return params
 
 
-def set_cell(env: ManagerBasedRlEnv, cell: Cell) -> None:
-    """Select ``cell`` for a FaultLadder environment; it applies on the next reset."""
-    for name, params in event_params(cell).items():
+def cell(axis: str, level: int) -> Cell:
+    """The ladder cell of ``axis`` at ``level`` (1 to 5)."""
+    return Cell(axis, level, load()["axes"][axis]["levels"][level - 1])
+
+
+def set_cell(env: ManagerBasedRlEnv, *cells: Cell) -> None:
+    """Select ``cells`` for a FaultLadder environment; they apply on the next reset."""
+    for name, params in event_params(*cells).items():
         env.event_manager.get_term_cfg(name).params.update(params)

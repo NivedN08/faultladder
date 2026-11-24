@@ -20,7 +20,7 @@ from mjlab.tasks.registry import load_env_cfg, load_rl_cfg, load_runner_cls
 from mjlab.tasks.velocity.mdp import UniformVelocityCommand, UniformVelocityCommandCfg
 from mjlab.utils.torch import configure_torch_backends
 
-from faultladder import ladder, score
+from faultladder import events, ladder, score
 from faultladder.ladder import Cell
 from faultladder.tasks import EVAL_TASK
 
@@ -89,23 +89,33 @@ def make_policy(
     return runner.get_inference_policy(device=device)
 
 
-def run_cell(
+def run_episodes(
     env: ManagerBasedRlEnv,
     wrapped: RslRlVecEnvWrapper,
     policy: Policy,
-    cell: Cell,
+    cells: tuple[Cell, ...],
     commands: torch.Tensor,
     seed: int,
     episode_seconds: float,
     scored_seconds: float,
+    onset_seconds: float = 0.0,
 ) -> dict[str, Any]:
-    """Run one episode per environment under ``cell`` and score it.
+    """Run one episode per environment under ``cells`` together and score it.
+
+    With ``onset_seconds`` the robot starts healthy and the cells (motor axes
+    only) take effect that many seconds into the episode.
 
     Call inside ``torch.inference_mode()``: mjlab's buffers become inference
     tensors on the first step and cannot be reset outside it afterwards.
     """
     torch.manual_seed(seed)
-    ladder.set_cell(env, cell)
+    onset_step = round(onset_seconds / env.step_dt)
+    if onset_step:
+        if not all(cell.axis.startswith("motor_") for cell in cells):
+            raise ValueError("only motor faults can start mid-episode")
+        ladder.set_cell(env, ladder.nominal_cell())
+    else:
+        ladder.set_cell(env, *cells)
     wrapped.reset()
     twist = env.command_manager.get_term("twist")
     assert isinstance(twist, UniformVelocityCommand)
@@ -118,6 +128,12 @@ def run_cell(
     ang_err = torch.zeros(env.num_envs, device=env.device)
     obs = wrapped.get_observations()
     for step in range(steps):
+        if onset_step and step == onset_step:
+            # A robot that falls later respawns faulty; it has already failed.
+            ladder.set_cell(env, *cells)
+            events.motor_strength(
+                env, None, **ladder.event_params(*cells)[ladder.MOTOR]
+            )
         obs, _, dones, _ = wrapped.step(policy(obs))
         # Episodes never time out here, so a done is a fall. The fallen robot
         # respawns with a new command; it is already a failure.
@@ -133,9 +149,6 @@ def run_cell(
     success = score.episode_success(fell, lin_err, ang_err)
     upright = ~fell
     return {
-        "axis": cell.axis,
-        "level": cell.level,
-        "value": cell.value,
         "score": score.cell_score(success),
         "fall_rate": float(fell.float().mean()),
         "episodes": env.num_envs,
@@ -143,6 +156,23 @@ def run_cell(
         "mean_lin_err": float(lin_err[upright].mean()) if upright.any() else None,
         "mean_ang_err": float(ang_err[upright].mean()) if upright.any() else None,
     }
+
+
+def run_cell(
+    env: ManagerBasedRlEnv,
+    wrapped: RslRlVecEnvWrapper,
+    policy: Policy,
+    cell: Cell,
+    commands: torch.Tensor,
+    seed: int,
+    episode_seconds: float,
+    scored_seconds: float,
+) -> dict[str, Any]:
+    """One ladder cell: :func:`run_episodes` under ``cell`` alone."""
+    result = run_episodes(
+        env, wrapped, policy, (cell,), commands, seed, episode_seconds, scored_seconds
+    )
+    return {"axis": cell.axis, "level": cell.level, "value": cell.value, **result}
 
 
 def summarize(cells: list[dict[str, Any]]) -> dict[str, Any] | None:
