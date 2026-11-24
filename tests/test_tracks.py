@@ -5,7 +5,7 @@ import json
 import pytest
 import torch
 
-from faultladder import ladder, score, tracks
+from faultladder import ladder, score, tracks, tracks_report
 from faultladder.evaluate import make_env, run_episodes
 
 
@@ -140,3 +140,17 @@ def test_evaluate_writes_tracks_json(tmp_path):
     assert len(report["compound_cells"]) == 36
     assert report["scores"]["onset"]["onset"] == 0.0
     assert report["scores"]["compound"]["compound"] == 0.0
+
+
+def test_report_ranks_by_compound_and_refuses_mixed_protocols(tmp_path):
+    for name, agent in (("ppo_wide_seed0", "zero"), ("ppo_nodr_seed0", "random")):
+        tracks.evaluate(
+            agent, tmp_path / name, num_envs=2, device="cpu", episode_seconds=0.2
+        )
+    report = tracks_report.build(tmp_path)
+    assert "| PPO wide | 1 | 0.000 | 0.000 | 0.000 |" in report
+    assert "| motor_hip + payload | +0.000 | +0.000 |" in report
+    path = tmp_path / "ppo_nodr_seed0" / "tracks.json"
+    path.write_text(path.read_text().replace('"tracks": "v1"', '"tracks": "v0"'))
+    with pytest.raises(ValueError):
+        tracks_report.build(tmp_path)
