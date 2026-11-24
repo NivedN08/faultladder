@@ -4,3 +4,7 @@ date,phase,job,gpu,seconds,cost_usd,note
 2026-11-21,2,benchmark 300 iterations,L40S,244,0.15,in-job seconds; excludes container start-up
 2026-11-21,2,train Go1 seed 0 for 3000 iterations,L4,3425,1.06,app wall time from launch to stop; 2971 s of it was training
 2026-11-21,2,render 20 s video,A10,86,0.03,app wall time from launch to stop
+2026-11-22,3,ladder smoke 6 cells,L4,191,0.05,cost is in-job seconds; seconds is app wall time
+2026-11-22,3,ladder round 0: ppo x2 + zero + random,L4,2858,0.88,in-job seconds summed over 4 parallel jobs; excludes container start-up
+2026-11-22,3,payload probe 5 cells,L4,,0.03,estimate; in-job time not recorded
+2026-11-22,3,ladder round 1: ppo x2 + zero + random,L4,,0.88,in-job cost summed over 4 parallel jobs; excludes container start-up

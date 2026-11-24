@@ -1,0 +1,34 @@
+{
+  "ladder": "v0",
+  "task": "FaultLadder-Eval-Unitree-Go1",
+  "agent": "ppo",
+  "checkpoint": "runs/go1_seed0/model_2999.pt",
+  "seed": 0,
+  "episodes_per_cell": 256,
+  "episode_seconds": 10.0,
+  "scored_seconds": 8.0,
+  "tolerances": {
+    "lin": 0.25,
+    "ang": 0.5
+  },
+  "device": "cpu",
+  "versions": {
+    "mjlab": "1.6.0",
+    "mujoco": "3.11.0",
+    "mujoco-warp": "3.11.0"
+  },
+  "wall_seconds": 950.8254319159314,
+  "scores": null,
+  "cells": [
+    {
+      "axis": "nominal",
+      "level": 0,
+      "value": 0.0,
+      "score": 0.99609375,
+      "fall_rate": 0.00390625,
+      "episodes": 256,
+      "mean_lin_err": 0.0706753060221672,
+      "mean_ang_err": 0.05014121159911156
+    }
+  ]
+}
