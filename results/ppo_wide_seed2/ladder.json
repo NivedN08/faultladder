@@ -1,0 +1,403 @@
+{
+  "ladder": "v1",
+  "task": "FaultLadder-Eval-Unitree-Go1",
+  "agent": "ppo",
+  "baseline": "wide",
+  "checkpoint": "/runs/FaultLadder-Wide-Unitree-Go1/seed2/model_1319.pt",
+  "seed": 0,
+  "episodes_per_cell": 4096,
+  "episode_seconds": 10.0,
+  "scored_seconds": 8.0,
+  "tolerances": {
+    "lin": 0.25,
+    "ang": 0.5
+  },
+  "device": "cuda:0",
+  "versions": {
+    "mjlab": "1.6.0",
+    "mujoco": "3.11.0",
+    "mujoco-warp": "3.11.0"
+  },
+  "wall_seconds": 529.391313471,
+  "scores": {
+    "faultladder": 0.8368373325892857,
+    "fault": 0.76728515625,
+    "shift": 0.9295735677083333,
+    "nominal": 1.0,
+    "axes": {
+      "motor_hip": 0.85224609375,
+      "motor_thigh": 0.847265625,
+      "motor_calf": 0.702783203125,
+      "payload": 0.9978515625,
+      "friction": 0.88076171875,
+      "latency": 0.910107421875,
+      "push": 0.666845703125
+    },
+    "fall_rate": 0.032596261160714284
+  },
+  "cells": [
+    {
+      "axis": "nominal",
+      "level": 0,
+      "value": 0.0,
+      "score": 1.0,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.08078770339488983,
+      "mean_ang_err": 0.0615939199924469
+    },
+    {
+      "axis": "motor_hip",
+      "level": 1,
+      "value": 0.8,
+      "score": 1.0,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.08356405794620514,
+      "mean_ang_err": 0.061354223638772964
+    },
+    {
+      "axis": "motor_hip",
+      "level": 2,
+      "value": 0.6,
+      "score": 1.0,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.09068728983402252,
+      "mean_ang_err": 0.06826803088188171
+    },
+    {
+      "axis": "motor_hip",
+      "level": 3,
+      "value": 0.4,
+      "score": 0.99853515625,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.10244113206863403,
+      "mean_ang_err": 0.08513981103897095
+    },
+    {
+      "axis": "motor_hip",
+      "level": 4,
+      "value": 0.2,
+      "score": 0.9912109375,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.10809654742479324,
+      "mean_ang_err": 0.10854986310005188
+    },
+    {
+      "axis": "motor_hip",
+      "level": 5,
+      "value": 0.0,
+      "score": 0.271484375,
+      "fall_rate": 0.413818359375,
+      "episodes": 4096,
+      "mean_lin_err": 0.35747960209846497,
+      "mean_ang_err": 0.29605621099472046
+    },
+    {
+      "axis": "motor_thigh",
+      "level": 1,
+      "value": 0.8,
+      "score": 1.0,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.08299748599529266,
+      "mean_ang_err": 0.061408840119838715
+    },
+    {
+      "axis": "motor_thigh",
+      "level": 2,
+      "value": 0.6,
+      "score": 1.0,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.0901155024766922,
+      "mean_ang_err": 0.06528475880622864
+    },
+    {
+      "axis": "motor_thigh",
+      "level": 3,
+      "value": 0.4,
+      "score": 0.998291015625,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.10545969009399414,
+      "mean_ang_err": 0.07642073929309845
+    },
+    {
+      "axis": "motor_thigh",
+      "level": 4,
+      "value": 0.2,
+      "score": 0.953125,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.1322074830532074,
+      "mean_ang_err": 0.09834128618240356
+    },
+    {
+      "axis": "motor_thigh",
+      "level": 5,
+      "value": 0.0,
+      "score": 0.284912109375,
+      "fall_rate": 0.20654296875,
+      "episodes": 4096,
+      "mean_lin_err": 0.45385459065437317,
+      "mean_ang_err": 0.2597261369228363
+    },
+    {
+      "axis": "motor_calf",
+      "level": 1,
+      "value": 0.8,
+      "score": 1.0,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.08275427669286728,
+      "mean_ang_err": 0.06501070410013199
+    },
+    {
+      "axis": "motor_calf",
+      "level": 2,
+      "value": 0.6,
+      "score": 1.0,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.09361020475625992,
+      "mean_ang_err": 0.07483281195163727
+    },
+    {
+      "axis": "motor_calf",
+      "level": 3,
+      "value": 0.4,
+      "score": 0.9765625,
+      "fall_rate": 0.000244140625,
+      "episodes": 4096,
+      "mean_lin_err": 0.13276073336601257,
+      "mean_ang_err": 0.10446938872337341
+    },
+    {
+      "axis": "motor_calf",
+      "level": 4,
+      "value": 0.2,
+      "score": 0.495361328125,
+      "fall_rate": 0.003662109375,
+      "episodes": 4096,
+      "mean_lin_err": 0.24842867255210876,
+      "mean_ang_err": 0.1863844394683838
+    },
+    {
+      "axis": "motor_calf",
+      "level": 5,
+      "value": 0.0,
+      "score": 0.0419921875,
+      "fall_rate": 0.386474609375,
+      "episodes": 4096,
+      "mean_lin_err": 0.6249382495880127,
+      "mean_ang_err": 0.3536154627799988
+    },
+    {
+      "axis": "payload",
+      "level": 1,
+      "value": 0.12,
+      "score": 1.0,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.08330060541629791,
+      "mean_ang_err": 0.06117212399840355
+    },
+    {
+      "axis": "payload",
+      "level": 2,
+      "value": 0.24,
+      "score": 1.0,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.08895538747310638,
+      "mean_ang_err": 0.06626845896244049
+    },
+    {
+      "axis": "payload",
+      "level": 3,
+      "value": 0.36,
+      "score": 0.999755859375,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.09782809019088745,
+      "mean_ang_err": 0.07653392851352692
+    },
+    {
+      "axis": "payload",
+      "level": 4,
+      "value": 0.48,
+      "score": 0.998046875,
+      "fall_rate": 0.0009765625,
+      "episodes": 4096,
+      "mean_lin_err": 0.10942117869853973,
+      "mean_ang_err": 0.09113145619630814
+    },
+    {
+      "axis": "payload",
+      "level": 5,
+      "value": 0.6,
+      "score": 0.991455078125,
+      "fall_rate": 0.0009765625,
+      "episodes": 4096,
+      "mean_lin_err": 0.12271518260240555,
+      "mean_ang_err": 0.10913488268852234
+    },
+    {
+      "axis": "friction",
+      "level": 1,
+      "value": 0.6,
+      "score": 1.0,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.0761556476354599,
+      "mean_ang_err": 0.06396228075027466
+    },
+    {
+      "axis": "friction",
+      "level": 2,
+      "value": 0.45,
+      "score": 1.0,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.07313232868909836,
+      "mean_ang_err": 0.06366343796253204
+    },
+    {
+      "axis": "friction",
+      "level": 3,
+      "value": 0.3,
+      "score": 1.0,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.06795917451381683,
+      "mean_ang_err": 0.061159949749708176
+    },
+    {
+      "axis": "friction",
+      "level": 4,
+      "value": 0.2,
+      "score": 0.986572265625,
+      "fall_rate": 0.00048828125,
+      "episodes": 4096,
+      "mean_lin_err": 0.07628478854894638,
+      "mean_ang_err": 0.06105400621891022
+    },
+    {
+      "axis": "friction",
+      "level": 5,
+      "value": 0.1,
+      "score": 0.417236328125,
+      "fall_rate": 0.025146484375,
+      "episodes": 4096,
+      "mean_lin_err": 0.30874037742614746,
+      "mean_ang_err": 0.11851800978183746
+    },
+    {
+      "axis": "latency",
+      "level": 1,
+      "value": 0.5,
+      "score": 1.0,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.0877450630068779,
+      "mean_ang_err": 0.059834059327840805
+    },
+    {
+      "axis": "latency",
+      "level": 2,
+      "value": 1,
+      "score": 1.0,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.09055469930171967,
+      "mean_ang_err": 0.07280971854925156
+    },
+    {
+      "axis": "latency",
+      "level": 3,
+      "value": 2,
+      "score": 0.999267578125,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.10990013182163239,
+      "mean_ang_err": 0.10196603834629059
+    },
+    {
+      "axis": "latency",
+      "level": 4,
+      "value": 3,
+      "score": 0.951904296875,
+      "fall_rate": 0.027587890625,
+      "episodes": 4096,
+      "mean_lin_err": 0.13695992529392242,
+      "mean_ang_err": 0.1590641587972641
+    },
+    {
+      "axis": "latency",
+      "level": 5,
+      "value": 5,
+      "score": 0.599365234375,
+      "fall_rate": 0.072265625,
+      "episodes": 4096,
+      "mean_lin_err": 0.23353424668312073,
+      "mean_ang_err": 0.33167028427124023
+    },
+    {
+      "axis": "push",
+      "level": 1,
+      "value": 0.5,
+      "score": 0.999755859375,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.13247834146022797,
+      "mean_ang_err": 0.06545132398605347
+    },
+    {
+      "axis": "push",
+      "level": 2,
+      "value": 0.75,
+      "score": 0.998291015625,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.16719426214694977,
+      "mean_ang_err": 0.07012829184532166
+    },
+    {
+      "axis": "push",
+      "level": 3,
+      "value": 1.0,
+      "score": 0.923583984375,
+      "fall_rate": 0.0,
+      "episodes": 4096,
+      "mean_lin_err": 0.21028777956962585,
+      "mean_ang_err": 0.07635091245174408
+    },
+    {
+      "axis": "push",
+      "level": 4,
+      "value": 1.25,
+      "score": 0.412109375,
+      "fall_rate": 0.00048828125,
+      "episodes": 4096,
+      "mean_lin_err": 0.2632034122943878,
+      "mean_ang_err": 0.08439125865697861
+    },
+    {
+      "axis": "push",
+      "level": 5,
+      "value": 1.5,
+      "score": 0.00048828125,
+      "fall_rate": 0.002197265625,
+      "episodes": 4096,
+      "mean_lin_err": 0.3195495903491974,
+      "mean_ang_err": 0.09443119913339615
+    }
+  ],
+  "train_seed": 2,
+  "gpu": "A10",
+  "cost_usd": 0.20853782620249633
+}

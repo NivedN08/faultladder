@@ -8,3 +8,8 @@ date,phase,job,gpu,seconds,cost_usd,note
 2026-11-22,3,ladder round 0: ppo x2 + zero + random,L4,2858,0.88,in-job seconds summed over 4 parallel jobs; excludes container start-up
 2026-11-22,3,payload probe 5 cells,L4,,0.03,estimate; in-job time not recorded
 2026-11-22,3,ladder round 1: ppo x2 + zero + random,L4,,0.88,in-job cost summed over 4 parallel jobs; excludes container start-up
+2026-11-24,4,pilot seed 0: train + score 4 baselines (ladder round 1),A10,,3.02,in-job cost summed; excludes container start-up and two aborted launches
+2026-11-24,4,latency and push probe 11 cells x2,A10,,0.17,in-job cost
+2026-11-24,4,train 10 runs + score 12 (ladder round 2),A10,,8.15,in-job cost summed; seeds 0 nodr/default reused from the pilot
+2026-11-24,4,zero + random + rescore (ladder round 2),A10,,0.74,in-job cost summed
+2026-11-24,4,rescore all 15 runs on frozen ladder v1,A10,,3.31,in-job cost summed; same levels as round 2 with the version label v1

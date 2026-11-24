@@ -31,7 +31,8 @@ def test_image_has_one_mujoco() -> None:
 def test_price_includes_gpu_cpu_and_memory() -> None:
     price = modal_app.price_per_second("L40S")
     assert price == pytest.approx(0.000542 + 4 * 0.0000131 + 16 * 0.00000222)
-    assert modal_app.TRAIN_GPU in modal_app.GPU_PRICE
+    assert modal_app.TRAIN_GPUS[0] == modal_app.TRAIN_GPU
+    assert set(modal_app.TRAIN_GPUS) <= set(modal_app.GPU_PRICE)
     assert max(modal_app.GPU_PRICE.values()) == modal_app.GPU_PRICE["L40S"]
 
 

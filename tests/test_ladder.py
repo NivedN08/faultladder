@@ -24,8 +24,9 @@ LEVELS = {
         0.6,
     ],  # calibration round 1; plan had 0.1 to 0.5
     "friction": [0.6, 0.45, 0.3, 0.2, 0.1],
-    "latency": [1, 2, 3, 4, 5],
-    "push": [0.5, 1.0, 1.5, 2.0, 2.5],
+    # Calibration round 2; the plan had 1 to 5 steps and 0.5 to 2.5 m/s.
+    "latency": [0.5, 1, 2, 3, 5],
+    "push": [0.5, 0.75, 1.0, 1.25, 1.5],
 }
 
 
@@ -258,3 +259,12 @@ def test_nominal_cell_matches_the_unmodified_model(env):
         torch.testing.assert_close(
             _field(env, field), default.expand(NUM_ENVS, *default.shape)
         )
+
+
+def test_latency_of_half_a_control_step_is_two_physics_steps(env):
+    _apply(env, Cell("latency", 1, 0.5))
+    lags = env.scene["robot"].actuators[0]._delay_buffer.current_lags
+    assert lags.tolist() == [2] * NUM_ENVS
+    with pytest.raises(ValueError):
+        events.latency(env, None, steps=0.3)
+    _apply(env, ladder.nominal_cell())

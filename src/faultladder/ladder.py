@@ -10,7 +10,7 @@ from mjlab.envs import ManagerBasedRlEnv
 
 from faultladder.score import AXES, NUM_LEVELS
 
-LADDER_FILE = Path(__file__).with_name("ladder_v0.json")
+LADDER_FILE = Path(__file__).with_name("ladder_v1.json")
 NOMINAL = "nominal"
 
 # Event term names in the FaultLadder tasks (see ``faultladder.tasks``).
@@ -81,7 +81,7 @@ def event_params(cell: Cell) -> dict[str, dict[str, Any]]:
     elif cell.axis == "friction":
         params[FRICTION]["coefficient"] = cell.value
     elif cell.axis == "latency":
-        params[LATENCY]["steps"] = int(cell.value)
+        params[LATENCY]["steps"] = cell.value
     elif cell.axis == "push":
         params[PUSH]["speed"] = cell.value
     else:

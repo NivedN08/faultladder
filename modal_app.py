@@ -45,6 +45,21 @@ MEMORY_PRICE_PER_GIB = 0.00000222
 
 # The GPU with the most environment steps per dollar in results/gpu_benchmark.json.
 TRAIN_GPU = "L4"
+# Modal takes the first of these it has capacity for. On 2026-11-24 four L4
+# jobs waited 30 minutes unscheduled; an A10 gives 13% fewer steps per dollar.
+TRAIN_GPUS = [TRAIN_GPU, "A10"]
+
+
+def current_gpu() -> str:
+    """The GPU type this container actually got, as a key of ``GPU_PRICE``."""
+    import torch
+
+    name = torch.cuda.get_device_name(0).upper()
+    for gpu in sorted(GPU_PRICE, key=len, reverse=True):
+        if gpu in name:
+            return gpu
+    raise RuntimeError(f"no price known for GPU {name!r}")
+
 
 # 1.2 times the iteration where the seed-0 baseline's reward levelled off; see
 # results/go1_baseline_curve.json.
@@ -63,7 +78,7 @@ image = (
     .add_local_python_source("faultladder")
     # add_local_python_source copies only .py files; the ladder is package data.
     .add_local_file(
-        "src/faultladder/ladder_v0.json", "/root/faultladder/ladder_v0.json"
+        "src/faultladder/ladder_v1.json", "/root/faultladder/ladder_v1.json"
     )
 )
 app = modal.App("faultladder", image=image)
@@ -111,7 +126,7 @@ def benchmark_l40s(iterations: int = 300, num_envs: int = NUM_ENVS) -> dict:
     return _benchmark("L40S", iterations, num_envs)
 
 
-@app.function(gpu=TRAIN_GPU, timeout=120 * MINUTES, volumes={RUNS: volume}, **_job)
+@app.function(gpu=TRAIN_GPUS, timeout=120 * MINUTES, volumes={RUNS: volume}, **_job)
 def train(
     task: str = BASE_TASK,
     seed: int = 0,
@@ -125,8 +140,8 @@ def train(
     result = baseline.train(
         task, seed, iterations, log_dir, num_envs, "cuda:0", on_save=volume.commit
     )
-    result["gpu"] = TRAIN_GPU
-    result["price_per_second"] = price_per_second(TRAIN_GPU)
+    result["gpu"] = current_gpu()
+    result["price_per_second"] = price_per_second(result["gpu"])
     result["train_cost_usd"] = result["train_seconds"] * result["price_per_second"]
     previous = log_dir / "train.json"
     history = json.loads(previous.read_text()) if previous.exists() else []
@@ -155,35 +170,51 @@ def render(
     return on_volume
 
 
-@app.function(gpu=TRAIN_GPU, timeout=60 * MINUTES, volumes={RUNS: volume}, **_job)
+@app.function(gpu=TRAIN_GPUS, timeout=60 * MINUTES, volumes={RUNS: volume}, **_job)
 def evaluate(
     name: str,
     agent: str = "ppo",
-    run: str = f"{BASE_TASK}/seed0",
-    checkpoint: str = "",
+    baseline: str = "default",
     seed: int = 0,
+    run: str = "",
+    checkpoint: str = "",
+    eval_seed: int = 0,
     num_envs: int = 0,
     only: str = "",
 ) -> dict:
-    """Score an agent on the ladder; writes ``eval/<name>/ladder.json``."""
-    from faultladder import baseline
+    """Score an agent on the ladder; writes ``eval/<name>/ladder.json``.
+
+    A PPO agent is the newest checkpoint of ``baseline`` trained with ``seed``
+    unless ``run`` (a directory on the volume) or ``checkpoint`` say otherwise.
+    """
+    from faultladder import baseline as fl_baseline
     from faultladder import evaluate as fl_evaluate
+    from faultladder.tasks import BASELINES, EVAL_TASK
 
     path = None
+    task = EVAL_TASK
     if agent == "ppo":
+        task = BASELINES[baseline].eval_task
+        run = run or f"{BASELINES[baseline].train_task}/seed{seed}"
         log_dir = Path(RUNS) / run
-        path = log_dir / checkpoint if checkpoint else baseline.checkpoints(log_dir)[0]
+        if checkpoint:
+            path = log_dir / checkpoint
+        else:
+            path = fl_baseline.checkpoints(log_dir)[0]
     report = fl_evaluate.evaluate(
         agent,
         Path(RUNS) / "eval" / name,
         checkpoint=path,
         num_envs=num_envs or None,
         device="cuda:0",
-        seed=seed,
+        seed=eval_seed,
         only=only.split(",") if only else None,
+        task=task,
+        baseline=baseline if agent == "ppo" else agent,
     )
-    report["gpu"] = TRAIN_GPU
-    report["cost_usd"] = report["wall_seconds"] * price_per_second(TRAIN_GPU)
+    report["train_seed"] = seed if agent == "ppo" else None
+    report["gpu"] = current_gpu()
+    report["cost_usd"] = report["wall_seconds"] * price_per_second(report["gpu"])
     volume.commit()
     return report
 
@@ -192,20 +223,64 @@ def evaluate(
 def ladder(
     name: str,
     agent: str = "ppo",
-    run: str = f"{BASE_TASK}/seed0",
-    checkpoint: str = "",
+    baseline: str = "default",
     seed: int = 0,
+    run: str = "",
+    checkpoint: str = "",
+    eval_seed: int = 0,
     num_envs: int = 0,
     only: str = "",
     out: str = "results",
 ):
     """Score an agent on Modal and save ``<out>/<name>/ladder.json`` locally."""
-    report = evaluate.remote(name, agent, run, checkpoint, seed, num_envs, only)
+    report = evaluate.remote(
+        name, agent, baseline, seed, run, checkpoint, eval_seed, num_envs, only
+    )
     path = Path(out) / name / "ladder.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report["scores"], indent=2))
     print(f"wrote {path}; about ${report['cost_usd']:.2f} of GPU time")
+
+
+@app.local_entrypoint()
+def baselines(
+    names: str = "nodr,default,wide,privileged",
+    seeds: str = "0,1,2",
+    iterations: int = ITERATION_BUDGET,
+    out: str = "results",
+):
+    """Train each baseline and seed (four jobs at a time), then score it."""
+    from faultladder.tasks import BASELINES
+
+    jobs = [(name, int(seed)) for seed in seeds.split(",") for name in names.split(",")]
+    for start in range(0, len(jobs), 4):
+        batch = jobs[start : start + 4]
+        calls = [
+            train.spawn(BASELINES[name].train_task, seed, iterations)
+            for name, seed in batch
+        ]
+        for (name, seed), call in zip(batch, calls, strict=True):
+            result = call.get()
+            print(
+                f"trained {name} seed {seed} on {result['gpu']}: "
+                f"${result['train_cost_usd']:.2f}",
+                flush=True,
+            )
+        calls = [
+            evaluate.spawn(f"ppo_{name}_seed{seed}", "ppo", name, seed)
+            for name, seed in batch
+        ]
+        for (name, seed), call in zip(batch, calls, strict=True):
+            report = call.get()
+            path = Path(out) / f"ppo_{name}_seed{seed}" / "ladder.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(report, indent=2) + "\n")
+            print(
+                f"scored {name} seed {seed}: {report['scores']['faultladder']:.3f} "
+                f"(${report['cost_usd']:.2f})",
+                flush=True,
+            )
 
 
 @app.local_entrypoint()

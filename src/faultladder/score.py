@@ -29,6 +29,8 @@ G2_FLOOR = 0.05
 G4_LEVEL1 = 0.8
 G4_LEVEL5 = 0.5
 G6_REPEAT = 0.02
+G3_GAP = 0.15  # wide minus no randomisation
+G5_LEVEL3 = 0.5  # privileged success at level 3
 _EPS = 1e-9  # tolerance for comparisons that sit exactly on a threshold
 
 
@@ -108,6 +110,46 @@ def gates(
             "condition": f"rescoring differs by <= {G6_REPEAT}",
             "value": drift,
             "passed": drift <= G6_REPEAT + _EPS,
+        },
+    }
+    return {"checks": checks, "passed": all(c["passed"] for c in checks.values())}
+
+
+def spread(values: list[float]) -> float:
+    """Sample standard deviation across seeds; 0 for a single seed."""
+    if len(values) < 2:
+        return 0.0
+    mean = _mean(values)
+    return (sum((v - mean) ** 2 for v in values) / (len(values) - 1)) ** 0.5
+
+
+def baseline_gates(
+    nodr: list[float], wide: list[float], privileged_level3: dict[str, list[float]]
+) -> dict[str, Any]:
+    """Gates G3 and G5, which need the trained baselines.
+
+    ``nodr`` and ``wide`` are FaultLadder scores, one per seed. The seed spread
+    is the larger of their two standard deviations, so G3 needs at least two
+    seeds of each. ``privileged_level3`` maps
+    each axis to the privileged policy's level-3 success, one per seed.
+    """
+    gap = _mean(wide) - _mean(nodr)
+    seed_spread = max(spread(nodr), spread(wide))
+    level3 = {axis: _mean(privileged_level3[axis]) for axis in AXES}
+    failing = [axis for axis in AXES if level3[axis] < G5_LEVEL3 - _EPS]
+    checks: dict[str, dict[str, Any]] = {
+        "G3": {
+            "condition": f"wide - no randomisation >= {G3_GAP} and > 2 x seed spread",
+            "value": {"gap": gap, "seed_spread": seed_spread},
+            "passed": min(len(nodr), len(wide)) >= 2
+            and gap >= G3_GAP - _EPS
+            and gap > 2 * seed_spread,
+        },
+        "G5": {
+            "condition": f"privileged level 3 >= {G5_LEVEL3} per axis",
+            "value": {"lowest": min(level3.values())},
+            "failing_axes": failing,
+            "passed": not failing,
         },
     }
     return {"checks": checks, "passed": all(c["passed"] for c in checks.values())}
