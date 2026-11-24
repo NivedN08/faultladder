@@ -290,6 +290,32 @@ def tracks(
 
 
 @app.local_entrypoint()
+def scores(
+    names: str = "nodr,default,wide,privileged,recurrent",
+    seeds: str = "0,1,2,3,4",
+    out: str = "results",
+):
+    """Score already trained baselines and seeds on the ladder, eight at a time."""
+    jobs = [(name, int(seed)) for seed in seeds.split(",") for name in names.split(",")]
+    for start in range(0, len(jobs), 8):
+        batch = jobs[start : start + 8]
+        calls = [
+            evaluate.spawn(f"ppo_{name}_seed{seed}", "ppo", name, seed)
+            for name, seed in batch
+        ]
+        for (name, seed), call in zip(batch, calls, strict=True):
+            report = call.get()
+            path = Path(out) / f"ppo_{name}_seed{seed}" / "ladder.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(report, indent=2) + "\n")
+            print(
+                f"scored {name} seed {seed}: "
+                f"{report['scores']['faultladder']:.3f} (${report['cost_usd']:.2f})",
+                flush=True,
+            )
+
+
+@app.local_entrypoint()
 def ladder(
     name: str,
     agent: str = "ppo",
