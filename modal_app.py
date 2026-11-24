@@ -159,29 +159,43 @@ def render(
 def evaluate(
     name: str,
     agent: str = "ppo",
-    run: str = f"{BASE_TASK}/seed0",
-    checkpoint: str = "",
+    baseline: str = "default",
     seed: int = 0,
+    run: str = "",
+    checkpoint: str = "",
+    eval_seed: int = 0,
     num_envs: int = 0,
     only: str = "",
 ) -> dict:
-    """Score an agent on the ladder; writes ``eval/<name>/ladder.json``."""
-    from faultladder import baseline
+    """Score an agent on the ladder; writes ``eval/<name>/ladder.json``.
+
+    A PPO agent is the newest checkpoint of ``baseline`` trained with ``seed``
+    unless ``run`` (a directory on the volume) or ``checkpoint`` say otherwise.
+    """
+    from faultladder import baseline as fl_baseline
     from faultladder import evaluate as fl_evaluate
+    from faultladder.tasks import BASELINES, EVAL_TASK
 
     path = None
+    task = EVAL_TASK
     if agent == "ppo":
+        task = BASELINES[baseline].eval_task
+        run = run or f"{BASELINES[baseline].train_task}/seed{seed}"
         log_dir = Path(RUNS) / run
-        path = log_dir / checkpoint if checkpoint else baseline.checkpoints(log_dir)[0]
+        newest = fl_baseline.checkpoints(log_dir)[0]
+        path = log_dir / checkpoint if checkpoint else newest
     report = fl_evaluate.evaluate(
         agent,
         Path(RUNS) / "eval" / name,
         checkpoint=path,
         num_envs=num_envs or None,
         device="cuda:0",
-        seed=seed,
+        seed=eval_seed,
         only=only.split(",") if only else None,
+        task=task,
+        baseline=baseline if agent == "ppo" else agent,
     )
+    report["train_seed"] = seed if agent == "ppo" else None
     report["gpu"] = TRAIN_GPU
     report["cost_usd"] = report["wall_seconds"] * price_per_second(TRAIN_GPU)
     volume.commit()
@@ -192,20 +206,59 @@ def evaluate(
 def ladder(
     name: str,
     agent: str = "ppo",
-    run: str = f"{BASE_TASK}/seed0",
-    checkpoint: str = "",
+    baseline: str = "default",
     seed: int = 0,
+    run: str = "",
+    checkpoint: str = "",
+    eval_seed: int = 0,
     num_envs: int = 0,
     only: str = "",
     out: str = "results",
 ):
     """Score an agent on Modal and save ``<out>/<name>/ladder.json`` locally."""
-    report = evaluate.remote(name, agent, run, checkpoint, seed, num_envs, only)
+    report = evaluate.remote(
+        name, agent, baseline, seed, run, checkpoint, eval_seed, num_envs, only
+    )
     path = Path(out) / name / "ladder.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report["scores"], indent=2))
     print(f"wrote {path}; about ${report['cost_usd']:.2f} of GPU time")
+
+
+@app.local_entrypoint()
+def baselines(
+    names: str = "nodr,default,wide,privileged",
+    seeds: str = "0,1,2",
+    iterations: int = ITERATION_BUDGET,
+    out: str = "results",
+):
+    """Train each baseline and seed (four jobs at a time), then score it."""
+    from faultladder.tasks import BASELINES
+
+    jobs = [(name, int(seed)) for seed in seeds.split(",") for name in names.split(",")]
+    for start in range(0, len(jobs), 4):
+        batch = jobs[start : start + 4]
+        calls = [
+            train.spawn(BASELINES[name].train_task, seed, iterations)
+            for name, seed in batch
+        ]
+        for (name, seed), call in zip(batch, calls, strict=True):
+            result = call.get()
+            print(f"trained {name} seed {seed}: ${result['train_cost_usd']:.2f}")
+        calls = [
+            evaluate.spawn(f"ppo_{name}_seed{seed}", "ppo", name, seed)
+            for name, seed in batch
+        ]
+        for (name, seed), call in zip(batch, calls, strict=True):
+            report = call.get()
+            path = Path(out) / f"ppo_{name}_seed{seed}" / "ladder.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(report, indent=2) + "\n")
+            print(
+                f"scored {name} seed {seed}: {report['scores']['faultladder']:.3f} "
+                f"(${report['cost_usd']:.2f})"
+            )
 
 
 @app.local_entrypoint()

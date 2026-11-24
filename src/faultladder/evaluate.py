@@ -49,14 +49,14 @@ def sample_commands(
 
 
 def make_env(
-    num_envs: int, device: str, seed: int
+    num_envs: int, device: str, seed: int, task: str = EVAL_TASK
 ) -> tuple[ManagerBasedRlEnv, RslRlVecEnvWrapper]:
     configure_torch_backends()
-    cfg = load_env_cfg(EVAL_TASK)
+    cfg = load_env_cfg(task)
     cfg.scene.num_envs = num_envs
     cfg.seed = seed
     env = ManagerBasedRlEnv(cfg=cfg, device=device)
-    clip = load_rl_cfg(EVAL_TASK).clip_actions
+    clip = load_rl_cfg(task).clip_actions
     return env, RslRlVecEnvWrapper(env, clip_actions=clip)
 
 
@@ -66,6 +66,7 @@ def make_policy(
     checkpoint: str | Path | None,
     device: str,
     seed: int,
+    task: str = EVAL_TASK,
 ) -> Policy:
     num_envs, num_actions = wrapped.num_envs, wrapped.num_actions
     if agent == "zero":
@@ -80,8 +81,8 @@ def make_policy(
         raise ValueError(f"agent must be one of {AGENTS}, got {agent!r}")
     if checkpoint is None or not Path(checkpoint).is_file():
         raise FileNotFoundError(f"checkpoint not found: {checkpoint}")
-    runner_cls = load_runner_cls(EVAL_TASK) or MjlabOnPolicyRunner
-    runner = runner_cls(wrapped, asdict(load_rl_cfg(EVAL_TASK)), None, device)
+    runner_cls = load_runner_cls(task) or MjlabOnPolicyRunner
+    runner = runner_cls(wrapped, asdict(load_rl_cfg(task)), None, device)
     runner.load(
         str(checkpoint), load_cfg={"actor": True}, strict=True, map_location=device
     )
@@ -177,8 +178,14 @@ def evaluate(
     seed: int = 0,
     only: list[str] | None = None,
     episode_seconds: float | None = None,
+    task: str = EVAL_TASK,
+    baseline: str | None = None,
 ) -> dict[str, Any]:
-    """Run every ladder cell (or those named in ``only``) and write ladder.json."""
+    """Run every ladder cell (or those named in ``only``) and write ladder.json.
+
+    ``task`` is the evaluation task matching the policy's observations and
+    ``baseline`` the name the leaderboard groups this run under.
+    """
     spec = ladder.load()
     num_envs = int(num_envs or spec["episodes"])
     episode_seconds = float(episode_seconds or spec["episode_seconds"])
@@ -187,8 +194,8 @@ def evaluate(
     if not cells:
         raise ValueError(f"no ladder cell matches {only}")
     start = time.perf_counter()
-    env, wrapped = make_env(num_envs, device, seed)
-    policy = make_policy(agent, wrapped, checkpoint, device, seed)
+    env, wrapped = make_env(num_envs, device, seed, task)
+    policy = make_policy(agent, wrapped, checkpoint, device, seed, task)
     twist_cfg = env.cfg.commands["twist"]
     assert isinstance(twist_cfg, UniformVelocityCommandCfg)
     commands = sample_commands(
@@ -218,8 +225,9 @@ def evaluate(
     env.close()
     report = {
         "ladder": spec["version"],
-        "task": EVAL_TASK,
+        "task": task,
         "agent": agent,
+        "baseline": baseline or agent,
         "checkpoint": str(checkpoint) if checkpoint else None,
         "seed": seed,
         "episodes_per_cell": num_envs,
@@ -247,6 +255,8 @@ def main() -> None:
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--only", nargs="*", help="cell names, e.g. nominal push/3")
+    parser.add_argument("--task", default=EVAL_TASK, help="evaluation task")
+    parser.add_argument("--baseline", help="leaderboard name, e.g. wide")
     args = parser.parse_args()
     report = evaluate(
         args.agent,
@@ -256,6 +266,8 @@ def main() -> None:
         device=args.device,
         seed=args.seed,
         only=args.only,
+        task=args.task,
+        baseline=args.baseline,
     )
     print(json.dumps(report["scores"], indent=2))
 
