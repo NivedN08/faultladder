@@ -1,4 +1,4 @@
-"""Check the validity gates from saved ladder runs and write ``gate.md``.
+"""Check the six validity gates from saved ladder runs and write ``gate.md``.
 
 uv run python -m faultladder.gate
 """
@@ -10,55 +10,126 @@ from typing import Any
 
 from faultladder import score
 
+BASELINES = {
+    "nodr": "PPO no randomisation",
+    "default": "PPO default",
+    "wide": "PPO wide",
+    "privileged": "PPO privileged",
+}
+COMMANDS = {
+    "G1": "uv run modal run modal_app.py::baselines",
+    "G2": "uv run modal run modal_app.py::ladder --agent zero (and --agent random)",
+    "G3": "uv run modal run modal_app.py::baselines",
+    "G4": "uv run modal run modal_app.py::baselines",
+    "G5": "uv run modal run modal_app.py::baselines",
+    "G6": "uv run modal run modal_app.py::ladder --name ppo_default_seed0_rescore "
+    "--baseline default --seed 1",
+}
 
-def _load(run: str | Path) -> dict[str, Any]:
+
+def load(run: str | Path) -> dict[str, Any]:
     report = json.loads((Path(run) / "ladder.json").read_text())
     if report["scores"] is None:
         raise ValueError(f"{run} does not cover the whole ladder")
     return report
 
 
-def _cells(report: dict[str, Any]) -> dict[str, list[float]]:
-    cells: dict[str, list[float]] = {axis: [] for axis in score.AXES}
+def cells(report: dict[str, Any]) -> dict[str, list[float]]:
+    """Success rate at levels 1 to 5 of every axis."""
+    out: dict[str, list[float]] = {axis: [] for axis in score.AXES}
     for cell in sorted(report["cells"], key=lambda c: c["level"]):
         if cell["level"] > 0:
-            cells[cell["axis"]].append(cell["score"])
-    return cells
+            out[cell["axis"]].append(cell["score"])
+    return out
 
 
-def check(
-    ppo: str | Path, rescore: str | Path, zero: str | Path, random: str | Path
-) -> tuple[dict[str, Any], str]:
-    """Gates G1, G2, G4 and G6 for the default policy, and a Markdown report."""
-    default, again = _load(ppo), _load(rescore)
-    floor = {name: _load(run) for name, run in (("zero", zero), ("random", random))}
-    cells = _cells(default)
-    result = score.gates(
+def load_baselines(results: str | Path) -> dict[str, list[dict[str, Any]]]:
+    """Every ``ppo_<baseline>_seed<n>`` run under ``results``, in seed order."""
+    runs: dict[str, list[dict[str, Any]]] = {}
+    for name in BASELINES:
+        paths = [
+            p
+            for p in Path(results).glob(f"ppo_{name}_seed*")
+            if p.name.removeprefix(f"ppo_{name}_seed").isdigit()
+        ]
+        paths.sort(key=lambda p: int(p.name.removeprefix(f"ppo_{name}_seed")))
+        runs[name] = [load(p) for p in paths]
+    return runs
+
+
+def _measured(gate: dict[str, Any]) -> str:
+    parts = []
+    value = gate.get("value")
+    if isinstance(value, dict):
+        parts += [f"{k} {v:.4f}" for k, v in value.items()]
+    elif value is not None:
+        parts.append(f"{value:.4f}")
+    if gate.get("failing_axes"):
+        parts.append(f"failing axes: {', '.join(gate['failing_axes'])}")
+    return "; ".join(parts) or "all axes pass"
+
+
+def check(results: str | Path) -> tuple[dict[str, Any], str]:
+    """All six gates from the runs under ``results``, and a Markdown report.
+
+    G1, G4 and G6 use the default policy of the lowest seed.
+    """
+    results = Path(results)
+    runs = load_baselines(results)
+    for name, reports in runs.items():
+        if not reports:
+            raise ValueError(f"no ppo_{name}_seed* runs under {results}")
+    default = runs["default"][0]
+    again = load(results / f"ppo_default_seed{default['seed']}_rescore")
+    floor = {name: load(results / name) for name in ("zero", "random")}
+    everything = [default, again, *floor.values()]
+    everything += [r for reports in runs.values() for r in reports]
+    if len({r["ladder"] for r in everything}) != 1:
+        raise ValueError("the runs were scored on different ladder versions")
+    default_cells = cells(default)
+    first = score.gates(
         ppo_default=default["scores"],
-        ppo_default_cells=cells,
+        ppo_default_cells=default_cells,
         zero=floor["zero"]["scores"]["faultladder"],
         random=floor["random"]["scores"]["faultladder"],
         rescored=again["scores"]["faultladder"],
     )
+    level3 = {
+        axis: [cells(r)[axis][2] for r in runs["privileged"]] for axis in score.AXES
+    }
+    second = score.baseline_gates(
+        nodr=[r["scores"]["faultladder"] for r in runs["nodr"]],
+        wide=[r["scores"]["faultladder"] for r in runs["wide"]],
+        privileged_level3=level3,
+    )
+    checks = dict(sorted({**first["checks"], **second["checks"]}.items()))
+    result = {"checks": checks, "passed": all(c["passed"] for c in checks.values())}
+    seeds = ", ".join(str(r["seed"]) for r in runs["wide"])
     lines = [
         "# FaultLadder validity gates",
         "",
         f"Ladder {default['ladder']}, {default['episodes_per_cell']} episodes per "
-        f"cell. Default policy: `{default['checkpoint']}`, seed {default['seed']}; "
-        f"rescored with seed {again['seed']}.",
+        f"cell. G1, G4 and G6 use the default policy of seed {default['seed']}; "
+        f"G3 and G5 use seeds {seeds}. The seed spread in G3 is the larger of the "
+        "two baselines' standard deviations across seeds; G5 uses the mean across "
+        "seeds.",
         "",
-        "| Gate | Condition | Measured | Result |",
-        "| --- | --- | --- | --- |",
+        "Every row is recomputed from the saved runs by "
+        "`uv run python -m faultladder.gate`. The last column is the command that "
+        "produced those runs.",
+        "",
+        "| Gate | Condition | Measured | Result | Runs produced by |",
+        "| --- | --- | --- | --- | --- |",
     ]
-    for name, gate in result["checks"].items():
-        measured = gate.get("value", f"failing axes: {gate.get('failing_axes')}")
-        if isinstance(measured, float):
-            measured = f"{measured:.4f}"
+    for name, gate in checks.items():
         verdict = "pass" if gate["passed"] else "FAIL"
-        lines.append(f"| {name} | {gate['condition']} | {measured} | {verdict} |")
+        lines.append(
+            f"| {name} | {gate['condition']} | {_measured(gate)} | {verdict} | "
+            f"`{COMMANDS[name]}` |"
+        )
     lines += [
         "",
-        "G3 and G5 need the Phase 4 baselines and are not checked here.",
+        "All six gates pass." if result["passed"] else "At least one gate FAILS.",
         "",
         "## Default policy, success rate per cell",
         "",
@@ -66,31 +137,30 @@ def check(
         "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     for axis in score.AXES:
-        row = " | ".join(f"{value:.3f}" for value in cells[axis])
+        row = " | ".join(f"{value:.3f}" for value in default_cells[axis])
         lines.append(f"| {axis} | {row} | {default['scores']['axes'][axis]:.3f} |")
     lines += [
         "",
-        "| Agent | FaultLadder | Fault | Shift | Nominal | Fall rate |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "## Privileged policy at level 3, per seed",
+        "",
+        "| Axis | "
+        + " | ".join(f"Seed {r['seed']}" for r in runs["privileged"])
+        + " |",
+        "| --- |" + " --- |" * len(runs["privileged"]),
     ]
-    for name, report in (("ppo_default", default), *floor.items()):
-        s = report["scores"]
+    for axis in score.AXES:
         lines.append(
-            f"| {name} | {s['faultladder']:.3f} | {s['fault']:.3f} | "
-            f"{s['shift']:.3f} | {s['nominal']:.3f} | {s['fall_rate']:.3f} |"
+            f"| {axis} | " + " | ".join(f"{v:.3f}" for v in level3[axis]) + " |"
         )
     return result, "\n".join(lines) + "\n"
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ppo", default="results/ppo_default_seed0")
-    parser.add_argument("--rescore", default="results/ppo_default_seed0_rescore")
-    parser.add_argument("--zero", default="results/zero")
-    parser.add_argument("--random", default="results/random")
+    parser.add_argument("--results", default="results")
     parser.add_argument("--out", default="results/gate.md")
     args = parser.parse_args()
-    result, report = check(args.ppo, args.rescore, args.zero, args.random)
+    result, report = check(args.results)
     Path(args.out).write_text(report)
     print(report)
     raise SystemExit(0 if result["passed"] else 1)
