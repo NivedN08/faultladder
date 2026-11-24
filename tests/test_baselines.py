@@ -4,6 +4,7 @@ import pytest
 import torch
 from mjlab.envs import ManagerBasedRlEnv
 from mjlab.tasks.registry import load_env_cfg
+from mjlab.utils.lab_api.math import quat_apply_yaw
 
 from faultladder import events, ladder
 from faultladder.baseline import BASE_TASK
@@ -77,16 +78,49 @@ def test_wide_payload_friction_and_latency_cover_levels_one_to_three(wide):
     payload, offset, friction, latency = parameters[:, 12:].T
     assert payload.min() >= 0.0 and payload.max() <= 0.36 + 1e-6
     assert payload.max() > 0.24
-    assert offset.abs().max() <= 0.1
+    assert offset.abs().max() <= 0.1 + 0.025
     assert friction.min() >= 0.3 and friction.min() < 0.6
     assert set(latency.tolist()) == {i / 4 for i in range(9)}
 
 
-def test_wide_pushes_sideways_up_to_level_three():
+def test_wide_pushes_sideways_up_to_level_three_whatever_the_heading(wide):
     cfg = load_env_cfg(BASELINES["wide"].train_task)
-    assert cfg.events["push_robot"].params["velocity_range"]["y"] == (-1.0, 1.0)
+    push = cfg.events["push_robot"]
+    assert push.func is events.heading_frame_push
+    assert push.params["velocity_range"]["y"] == (-1.0, 1.0)
     base = load_env_cfg(BASE_TASK)
     assert base.events["push_robot"].params["velocity_range"]["y"] == (-0.5, 0.5)
+    robot = wide.scene["robot"]
+    side = torch.zeros(NUM_ENVS, 3)
+    side[:, 1] = 1.0
+    side_w = quat_apply_yaw(robot.data.root_link_quat_w, side)
+    largest = 0.0
+    for _ in range(20):
+        before = robot.data.root_link_vel_w.clone()
+        events.heading_frame_push(wide, None, **push.params)
+        wide.sim.forward()
+        delta = robot.data.root_link_vel_w - before
+        largest = max(largest, float((delta[:, :3] * side_w).sum(dim=1).abs().max()))
+    assert 0.9 < largest <= 1.0 + 1e-5
+
+
+def test_wide_keeps_the_base_shift_of_the_trunk_centre_of_mass(wide):
+    cfg = load_env_cfg(BASELINES["wide"].train_task)
+    base = load_env_cfg(BASE_TASK)
+    assert "base_com" not in cfg.events
+    ranges = base.events["base_com"].params["ranges"]
+    assert cfg.events["wide_payload"].params["com_range"] == ranges
+    trunk = int(wide.scene["robot"].indexing.root_body_id)
+    shift = (
+        wide.sim.model.body_ipos[:, trunk]
+        - wide.sim.get_default_field("body_ipos")[trunk]
+    )
+    # The payload moves the centre of mass along y only, so x and z show the
+    # base shift alone.
+    for axis in (0, 2):
+        low, high = ranges[axis]
+        assert shift[:, axis].min() >= low and shift[:, axis].max() <= high
+        assert shift[:, axis].max() - shift[:, axis].min() > 0.5 * (high - low)
 
 
 def test_wide_survives_zero_and_random_actions(wide):

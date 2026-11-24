@@ -98,10 +98,14 @@ def payload(
     env_ids: torch.Tensor | None,
     mass_fraction: float | tuple[float, float],
     max_offset: float = 0.1,
+    com_range: dict[int, tuple[float, float]] | None = None,
 ) -> None:
     """Attach a point mass to the trunk, offset sideways by up to ``max_offset``.
 
     A ``(low, high)`` ``mass_fraction`` draws one value per environment.
+    ``com_range`` first shifts the bare trunk's centre of mass by a uniform
+    draw per body axis (m), so that training keeps the base task's own trunk
+    randomisation, which this event would otherwise overwrite.
 
     The mass is ``mass_fraction`` of the whole robot's mass and sits at the
     trunk's centre of mass shifted along the body y axis. The trunk's mass,
@@ -132,6 +136,8 @@ def payload(
     total = mass0[trunk] + added
     offset = (torch.rand(n, device=env.device) * 2 - 1) * max_offset
     ipos = ipos0.repeat(n, 1)
+    for axis, (low, high) in (com_range or {}).items():
+        ipos[:, axis] += low + torch.rand(n, device=env.device) * (high - low)
     ipos[:, 1] += offset * added / total
     # Inertia of trunk plus point mass about their joint centre of mass, in the
     # body frame: two bodies a distance |offset| apart along y add
@@ -275,4 +281,29 @@ def lateral_push(
     kick[:, 1] = sign * speed
     velocity = asset.data.root_link_vel_w[ids].clone()
     velocity[:, :3] += quat_apply_yaw(asset.data.root_link_quat_w[ids], kick)
+    asset.write_root_link_velocity_to_sim(velocity, env_ids=ids)
+
+
+PUSH_AXES = ("x", "y", "z", "roll", "pitch", "yaw")
+
+
+def heading_frame_push(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor | None,
+    velocity_range: dict[str, tuple[float, float]],
+) -> None:
+    """mjlab's velocity push with x and y along the robot's heading and side.
+
+    mjlab's ``push_by_setting_velocity`` draws x and y in the world frame, so
+    a turned robot is kicked sideways by a mix of both ranges. Here ``y`` is
+    always the robot's side, as in :func:`lateral_push`.
+    """
+    ids = _env_ids(env, env_ids)
+    asset: Entity = env.scene[ROBOT]
+    kick = torch.zeros(len(ids), 6, device=env.device)
+    for column, axis in enumerate(PUSH_AXES):
+        low, high = velocity_range.get(axis, (0.0, 0.0))
+        kick[:, column] = low + torch.rand(len(ids), device=env.device) * (high - low)
+    kick[:, :3] = quat_apply_yaw(asset.data.root_link_quat_w[ids], kick[:, :3])
+    velocity = asset.data.root_link_vel_w[ids] + kick
     asset.write_root_link_velocity_to_sim(velocity, env_ids=ids)
