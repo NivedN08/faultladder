@@ -181,9 +181,10 @@ def test_privileged_eval_reports_the_cell_being_run():
 
 def test_recurrent_baseline_trains_and_is_scored_with_its_memory(tmp_path):
     recurrent = BASELINES["recurrent"]
-    rl_cfg = load_rl_cfg(recurrent.train_task)
+    rl_cfg: Any = load_rl_cfg(recurrent.train_task)
+    wide_cfg: Any = load_rl_cfg(BASELINES["wide"].train_task)
     assert rl_cfg.actor.class_name == "RNNModel" and rl_cfg.actor.rnn_type == "lstm"
-    assert load_rl_cfg(BASELINES["wide"].train_task).actor.rnn_type is None
+    assert wide_cfg.actor.rnn_type is None
     baseline.train(recurrent.train_task, 0, 2, tmp_path, num_envs=4, device="cpu")
     env, wrapped = evaluate.make_env(4, "cpu", 0, recurrent.eval_task)
     policy: Any = evaluate.make_policy(
