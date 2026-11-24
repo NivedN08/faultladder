@@ -1,5 +1,5 @@
 {
-  "version": "v0",
+  "version": "v1",
   "episodes": 4096,
   "episode_seconds": 10.0,
   "scored_seconds": 8.0,

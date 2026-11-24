@@ -78,7 +78,7 @@ image = (
     .add_local_python_source("faultladder")
     # add_local_python_source copies only .py files; the ladder is package data.
     .add_local_file(
-        "src/faultladder/ladder_v0.json", "/root/faultladder/ladder_v0.json"
+        "src/faultladder/ladder_v1.json", "/root/faultladder/ladder_v1.json"
     )
 )
 app = modal.App("faultladder", image=image)

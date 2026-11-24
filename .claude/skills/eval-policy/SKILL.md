@@ -54,6 +54,6 @@ The score has one definition, `faultladder.score`. Never recompute it elsewhere.
 
 - Zero and random agents are rerun whenever the ladder, the eval task or the
   score changes. Both must stay at or below 0.05.
-- Changing a level in `ladder_v0.json` is a calibration round; the plan allows
+- Changing a level in `ladder_v1.json` is a calibration round; the plan allows
   three. Record each in `results/STATUS.md` and rerun all four evaluations.
 - Report only numbers from a `ladder.json` you produced.

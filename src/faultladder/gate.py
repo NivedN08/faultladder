@@ -23,7 +23,7 @@ COMMANDS = {
     "G4": "uv run modal run modal_app.py::baselines",
     "G5": "uv run modal run modal_app.py::baselines",
     "G6": "uv run modal run modal_app.py::ladder --name ppo_default_seed0_rescore "
-    "--baseline default --seed 1",
+    "--baseline default --seed 0 --eval-seed 1",
 }
 
 
@@ -53,7 +53,10 @@ def load_baselines(results: str | Path) -> dict[str, list[dict[str, Any]]]:
             if p.name.removeprefix(f"ppo_{name}_seed").isdigit()
         ]
         paths.sort(key=lambda p: int(p.name.removeprefix(f"ppo_{name}_seed")))
-        runs[name] = [load(p) for p in paths]
+        runs[name] = [
+            {**load(p), "train_seed": int(p.name.removeprefix(f"ppo_{name}_seed"))}
+            for p in paths
+        ]
     return runs
 
 
@@ -80,7 +83,7 @@ def check(results: str | Path) -> tuple[dict[str, Any], str]:
         if not reports:
             raise ValueError(f"no ppo_{name}_seed* runs under {results}")
     default = runs["default"][0]
-    again = load(results / f"ppo_default_seed{default['seed']}_rescore")
+    again = load(results / f"ppo_default_seed{default['train_seed']}_rescore")
     floor = {name: load(results / name) for name in ("zero", "random")}
     everything = [default, again, *floor.values()]
     everything += [r for reports in runs.values() for r in reports]
@@ -104,14 +107,14 @@ def check(results: str | Path) -> tuple[dict[str, Any], str]:
     )
     checks = dict(sorted({**first["checks"], **second["checks"]}.items()))
     result = {"checks": checks, "passed": all(c["passed"] for c in checks.values())}
-    seeds = ", ".join(str(r["seed"]) for r in runs["wide"])
+    seeds = ", ".join(str(r["train_seed"]) for r in runs["wide"])
     lines = [
         "# FaultLadder validity gates",
         "",
         f"Ladder {default['ladder']}, {default['episodes_per_cell']} episodes per "
-        f"cell. G1, G4 and G6 use the default policy of seed {default['seed']}; "
-        f"G3 and G5 use seeds {seeds}. The seed spread in G3 is the larger of the "
-        "two baselines' standard deviations across seeds; G5 uses the mean across "
+        f"cell. G1, G4 and G6 use the default policy of training seed "
+        f"{default['train_seed']}; G3 and G5 use training seeds {seeds}. "
+        "The seed spread in G3 is the larger of the two baselines' standard deviations across seeds; G5 uses the mean across "
         "seeds.",
         "",
         "Every row is recomputed from the saved runs by "
@@ -144,7 +147,7 @@ def check(results: str | Path) -> tuple[dict[str, Any], str]:
         "## Privileged policy at level 3, per seed",
         "",
         "| Axis | "
-        + " | ".join(f"Seed {r['seed']}" for r in runs["privileged"])
+        + " | ".join(f"Seed {r['train_seed']}" for r in runs["privileged"])
         + " |",
         "| --- |" + " --- |" * len(runs["privileged"]),
     ]

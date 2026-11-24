@@ -49,6 +49,7 @@ def test_all_six_gates_pass(tmp_path):
     assert list(result["checks"]) == ["G1", "G2", "G3", "G4", "G5", "G6"]
     assert result["checks"]["G3"]["value"]["gap"] == pytest.approx(0.4)
     assert "FAIL" not in report
+    assert "| Seed 0 | Seed 1 | Seed 2 |" in report
 
 
 def test_g3_fails_when_wide_is_no_better(tmp_path):
