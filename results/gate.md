@@ -1,6 +1,6 @@
 # FaultLadder validity gates
 
-Ladder v1, 4096 episodes per cell. G1, G4 and G6 use the default policy of training seed 0; G3 and G5 use training seeds 0, 1, 2. The seed spread in G3 is the larger of the two baselines' standard deviations across seeds; G5 uses the mean across seeds.
+Ladder v1, 4096 episodes per cell. G1, G4 and G6 use the default policy of training seed 0; G3 and G5 use training seeds 0, 1, 2, 3, 4. The seed spread in G3 is the larger of the two baselines' standard deviations across seeds; G5 uses the mean across seeds.
 
 Every row is recomputed from the saved runs by `uv run python -m faultladder.gate`. The last column is the command that produced those runs.
 
@@ -8,9 +8,9 @@ Every row is recomputed from the saved runs by `uv run python -m faultladder.gat
 | --- | --- | --- | --- | --- |
 | G1 | nominal >= 0.95 | 1.0000 | pass | `uv run modal run modal_app.py::baselines` |
 | G2 | zero and random <= 0.05 | zero 0.0000; random 0.0000 | pass | `uv run modal run modal_app.py::ladder --agent zero (and --agent random)` |
-| G3 | wide - no randomisation >= 0.15 and > 2 x seed spread | gap 0.1810; seed_spread 0.0104 | pass | `uv run modal run modal_app.py::baselines` |
+| G3 | wide - no randomisation >= 0.15 and > 2 x seed spread | gap 0.1797; seed_spread 0.0142 | pass | `uv run modal run modal_app.py::baselines` |
 | G4 | level 1 >= 0.8 and level 5 <= 0.5 per axis | all axes pass | pass | `uv run modal run modal_app.py::baselines` |
-| G5 | privileged level 3 >= 0.5 per axis | lowest 0.9956 | pass | `uv run modal run modal_app.py::baselines` |
+| G5 | privileged level 3 >= 0.5 per axis | lowest 0.9957 | pass | `uv run modal run modal_app.py::baselines` |
 | G6 | rescoring differs by <= 0.02 | 0.0005 | pass | `uv run modal run modal_app.py::ladder --name ppo_default_seed0_rescore --baseline default --seed 0 --eval-seed 1` |
 
 All six gates pass.
@@ -29,12 +29,12 @@ All six gates pass.
 
 ## Privileged policy at level 3, per seed
 
-| Axis | Seed 0 | Seed 1 | Seed 2 |
-| --- | --- | --- | --- |
-| motor_hip | 1.000 | 0.999 | 0.999 |
-| motor_thigh | 1.000 | 0.999 | 0.999 |
-| motor_calf | 0.998 | 0.999 | 0.998 |
-| payload | 0.999 | 0.999 | 0.999 |
-| friction | 1.000 | 1.000 | 1.000 |
-| latency | 0.997 | 0.999 | 0.998 |
-| push | 0.989 | 1.000 | 0.999 |
+| Axis | Seed 0 | Seed 1 | Seed 2 | Seed 3 | Seed 4 |
+| --- | --- | --- | --- | --- | --- |
+| motor_hip | 1.000 | 1.000 | 0.997 | 0.999 | 0.999 |
+| motor_thigh | 0.997 | 0.999 | 1.000 | 1.000 | 0.999 |
+| motor_calf | 1.000 | 0.999 | 0.998 | 0.996 | 0.999 |
+| payload | 1.000 | 0.999 | 1.000 | 1.000 | 1.000 |
+| friction | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
+| latency | 1.000 | 1.000 | 0.993 | 1.000 | 1.000 |
+| push | 0.994 | 0.994 | 0.998 | 0.996 | 0.997 |

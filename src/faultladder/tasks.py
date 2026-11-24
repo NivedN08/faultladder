@@ -154,17 +154,27 @@ def wide_randomisation_env_cfg(
             "max_latency_steps": top["latency"],
         },
     )
+    # The payload event rebuilds the trunk from its defaults, so it takes over
+    # the base task's own shift of the trunk's centre of mass.
+    base_com = cfg.events.pop("base_com")
     cfg.events["wide_payload"] = EventTermCfg(
         mode="startup",
         func=events.payload,
         params={
             "mass_fraction": (0.0, top["payload"]),
             "max_offset": spec["payload_max_offset"],
+            "com_range": base_com.params["ranges"],
         },
     )
     if "push_robot" in cfg.events:  # The play setup has no pushes.
-        push = cfg.events["push_robot"].params["velocity_range"]
-        push["y"] = (-top["push"], top["push"])
+        push = cfg.events["push_robot"]
+        push.func = events.heading_frame_push
+        push.params = {
+            "velocity_range": {
+                **push.params["velocity_range"],
+                "y": (-top["push"], top["push"]),
+            }
+        }
     if privileged:
         _add_fault_observation(cfg)
     return cfg
