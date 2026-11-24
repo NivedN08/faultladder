@@ -84,6 +84,10 @@ def check(results: str | Path) -> tuple[dict[str, Any], str]:
             raise ValueError(f"no ppo_{name}_seed* runs under {results}")
     default = runs["default"][0]
     again = load(results / f"ppo_default_seed{default['train_seed']}_rescore")
+    if again["checkpoint"] != default["checkpoint"]:
+        raise ValueError(
+            "the rescore is of a different checkpoint than the default run"
+        )
     floor = {name: load(results / name) for name in ("zero", "random")}
     everything = [default, again, *floor.values()]
     everything += [r for reports in runs.values() for r in reports]

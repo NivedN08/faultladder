@@ -21,7 +21,7 @@ def _run(root, name: str, levels: list[float], nominal: float = 0.99, seed: int 
     report = {
         "ladder": "v1",
         "episodes_per_cell": 4096,
-        "checkpoint": f"{name}.pt",
+        "checkpoint": f"{name.removesuffix('_rescore')}.pt",
         "seed": seed,
         "scores": scores,
         "cells": cells,
@@ -91,6 +91,16 @@ def test_gate_needs_the_whole_ladder(tmp_path):
     path = root / "zero" / "ladder.json"
     report = json.loads(path.read_text())
     report["scores"] = None
+    path.write_text(json.dumps(report))
+    with pytest.raises(ValueError):
+        check(root)
+
+
+def test_gate_refuses_a_rescore_of_another_checkpoint(tmp_path):
+    root = _results(tmp_path, [1.0, 0.9, 0.8, 0.5, 0.3])
+    path = root / "ppo_default_seed0_rescore" / "ladder.json"
+    report = json.loads(path.read_text())
+    report["checkpoint"] = "older.pt"
     path.write_text(json.dumps(report))
     with pytest.raises(ValueError):
         check(root)
