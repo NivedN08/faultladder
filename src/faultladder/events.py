@@ -169,26 +169,28 @@ def foot_friction(
     env.sim.model.geom_friction[ids[:, None], feet, 0] = value
 
 
-def latency(env: ManagerBasedRlEnv, env_ids: torch.Tensor | None, steps: int) -> None:
+def latency(env: ManagerBasedRlEnv, env_ids: torch.Tensor | None, steps: float) -> None:
     """Delay every motor command by ``steps`` control steps.
 
-    Needs actuators built with ``delay_max_lag >= steps * decimation`` and
+    ``steps`` may be a fraction that is a whole number of physics steps. Needs
+    actuators built with ``delay_max_lag >= steps * decimation`` and
     ``delay_hold_prob=1.0`` (see ``faultladder.tasks``). Run in ``reset`` mode:
     mjlab zeroes the lag whenever an environment resets.
     """
     ids = _env_ids(env, env_ids)
-    _set_latency(env, ids, torch.full((len(ids),), steps, device=env.device))
+    lag = steps * env.cfg.decimation
+    if lag != round(lag):
+        raise ValueError(f"latency of {steps} control steps is not whole physics steps")
+    _set_lags(env, ids, torch.full((len(ids),), round(lag), device=env.device))
 
 
-def _set_latency(
-    env: ManagerBasedRlEnv, ids: torch.Tensor, steps: torch.Tensor
-) -> None:
+def _set_lags(env: ManagerBasedRlEnv, ids: torch.Tensor, lags: torch.Tensor) -> None:
+    """Set the command delay of ``ids`` in physics steps."""
     asset: Entity = env.scene[ROBOT]
-    lags = steps * env.cfg.decimation
     for actuator in asset.actuators:
         if int(lags.max()) > actuator.cfg.delay_max_lag:
             raise ValueError(
-                f"latency of {int(steps.max())} control steps needs delay_max_lag "
+                f"a delay of {int(lags.max())} physics steps needs delay_max_lag "
                 f">= {int(lags.max())}, got {actuator.cfg.delay_max_lag}"
             )
         actuator.set_lags(lags, ids)
@@ -200,13 +202,13 @@ def train_faults(
     env_ids: torch.Tensor | None,
     motor_prob: float,
     min_strength: float,
-    max_latency_steps: int,
+    max_latency_steps: float,
 ) -> None:
     """Training randomisation: a weak motor and a command delay per episode.
 
     With probability ``motor_prob`` one of the twelve motors gets a strength
     drawn from ``[min_strength, 1]``; the delay is 0 to ``max_latency_steps``
-    control steps. Both are redrawn at every reset.
+    control steps, in whole physics steps. Both are redrawn at every reset.
     """
     ids = _env_ids(env, env_ids)
     motor_strength(env, ids, None, 1.0)
@@ -218,8 +220,8 @@ def train_faults(
         1.0 - min_strength
     )
     _weaken(env, faulty, ctrl, strength)
-    steps = torch.randint(max_latency_steps + 1, (len(ids),), device=env.device)
-    _set_latency(env, ids, steps)
+    max_lag = round(max_latency_steps * env.cfg.decimation)
+    _set_lags(env, ids, torch.randint(max_lag + 1, (len(ids),), device=env.device))
 
 
 def fault_parameters(env: ManagerBasedRlEnv) -> torch.Tensor:

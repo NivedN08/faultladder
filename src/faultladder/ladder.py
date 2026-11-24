@@ -81,7 +81,7 @@ def event_params(cell: Cell) -> dict[str, dict[str, Any]]:
     elif cell.axis == "friction":
         params[FRICTION]["coefficient"] = cell.value
     elif cell.axis == "latency":
-        params[LATENCY]["steps"] = int(cell.value)
+        params[LATENCY]["steps"] = cell.value
     elif cell.axis == "push":
         params[PUSH]["speed"] = cell.value
     else:

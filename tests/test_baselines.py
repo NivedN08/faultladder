@@ -79,12 +79,12 @@ def test_wide_payload_friction_and_latency_cover_levels_one_to_three(wide):
     assert payload.max() > 0.24
     assert offset.abs().max() <= 0.1
     assert friction.min() >= 0.3 and friction.min() < 0.6
-    assert set(latency.tolist()) == {0.0, 1.0, 2.0, 3.0}
+    assert set(latency.tolist()) == {i / 4 for i in range(9)}
 
 
 def test_wide_pushes_sideways_up_to_level_three():
     cfg = load_env_cfg(BASELINES["wide"].train_task)
-    assert cfg.events["push_robot"].params["velocity_range"]["y"] == (-1.5, 1.5)
+    assert cfg.events["push_robot"].params["velocity_range"]["y"] == (-1.0, 1.0)
     base = load_env_cfg(BASE_TASK)
     assert base.events["push_robot"].params["velocity_range"]["y"] == (-0.5, 0.5)
 

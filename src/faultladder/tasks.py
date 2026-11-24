@@ -151,7 +151,7 @@ def wide_randomisation_env_cfg(
         params={
             "motor_prob": 0.5,
             "min_strength": min(top[f"motor_{kind}"] for kind in events.MOTOR_TYPES),
-            "max_latency_steps": int(top["latency"]),
+            "max_latency_steps": top["latency"],
         },
     )
     cfg.events["wide_payload"] = EventTermCfg(
