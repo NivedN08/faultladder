@@ -19,6 +19,8 @@ from mjlab.tasks.registry import load_env_cfg, load_rl_cfg, load_runner_cls
 from mjlab.utils.torch import configure_torch_backends
 from mjlab.utils.wrappers import VideoRecorder
 
+import faultladder.tasks  # noqa: F401  (registers the FaultLadder tasks)
+
 BASE_TASK = "Mjlab-Velocity-Flat-Unitree-Go1"
 SAVE_INTERVAL = 100
 
