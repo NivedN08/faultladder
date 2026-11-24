@@ -152,6 +152,12 @@ def run_episodes(
         "score": score.cell_score(success),
         "fall_rate": float(fell.float().mean()),
         "episodes": env.num_envs,
+        "by_tolerance": {
+            f"{scale:g}": score.cell_score(
+                score.episode_success(fell, lin_err, ang_err, scale)
+            )
+            for scale in score.TOLERANCE_SCALES
+        },
         # Diagnostics over the episodes that stayed upright.
         "mean_lin_err": float(lin_err[upright].mean()) if upright.any() else None,
         "mean_ang_err": float(ang_err[upright].mean()) if upright.any() else None,
@@ -175,15 +181,27 @@ def run_cell(
     return {"axis": cell.axis, "level": cell.level, "value": cell.value, **result}
 
 
-def summarize(cells: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """FaultLadder scores from cell results, or None if any cell is missing."""
+def summarize(
+    cells: list[dict[str, Any]], tolerance_scale: float | None = None
+) -> dict[str, Any] | None:
+    """FaultLadder scores from cell results, or None if any cell is missing.
+
+    ``tolerance_scale`` reads each cell's success at that multiple of the
+    tolerances instead; only the sensitivity report uses it.
+    """
+
+    def value(cell: dict[str, Any]) -> float:
+        if tolerance_scale is None:
+            return cell["score"]
+        return cell["by_tolerance"][f"{tolerance_scale:g}"]
+
     by_axis: dict[str, dict[int, float]] = {}
     nominal = None
     for cell in cells:
         if cell["level"] == 0:
-            nominal = cell["score"]
+            nominal = value(cell)
         else:
-            by_axis.setdefault(cell["axis"], {})[cell["level"]] = cell["score"]
+            by_axis.setdefault(cell["axis"], {})[cell["level"]] = value(cell)
     levels = range(1, score.NUM_LEVELS + 1)
     complete = nominal is not None and all(
         set(by_axis.get(axis, {})) == set(levels) for axis in score.AXES
