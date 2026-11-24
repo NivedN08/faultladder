@@ -17,21 +17,23 @@ FaultLadder aims to give a policy one number for that.
 A policy is trained any way its author likes. It is then scored on a frozen
 ladder of faults and shifts it was not tuned on.
 
-| Axis | What changes | Levels (draft) |
+| Axis | What changes | Levels (ladder v1) |
 | --- | --- | --- |
 | Motor, hip | Strength of one hip joint, as a fraction of normal | 0.8, 0.6, 0.4, 0.2, 0.0 |
 | Motor, thigh | Strength of one thigh joint, as a fraction of normal | 0.8, 0.6, 0.4, 0.2, 0.0 |
 | Motor, calf | Strength of one calf joint, as a fraction of normal | 0.8, 0.6, 0.4, 0.2, 0.0 |
-| Push | Sideways velocity kick every 2 s, in m/s | 0.5, 1.0, 1.5, 2.0, 2.5 |
-| Payload | Mass added to the trunk, as a fraction of robot mass | 0.1, 0.2, 0.3, 0.4, 0.5 |
+| Push | Sideways velocity kick every 2 s, in m/s | 0.5, 0.75, 1.0, 1.25, 1.5 |
+| Payload | Mass added to the trunk, as a fraction of robot mass | 0.12, 0.24, 0.36, 0.48, 0.6 |
 | Friction | Foot-to-floor friction coefficient | 0.6, 0.45, 0.3, 0.2, 0.1 |
-| Latency | Action delay, in 20 ms control steps | 1, 2, 3, 4, 5 |
+| Latency | Action delay, in 20 ms control steps | 0.5, 1, 2, 3, 5 |
 
 Each cell is scored by the fraction of episodes in which the robot stays up and
 keeps tracking its commanded velocity. The FaultLadder score is the mean over
 the seven axes, reported with two sub-scores: a fault score (the three motor
-axes and push) and a shift score (payload, friction and latency). These levels
-are a first draft and will be calibrated before a versioned ladder is frozen.
+axes and push) and a shift score (payload, friction and latency). The levels
+are frozen in `src/faultladder/ladder_v1.json`. Baseline scores are in
+[results/leaderboard.md](results/leaderboard.md) and the validity gates in
+[results/gate.md](results/gate.md).
 
 ## Related work
 

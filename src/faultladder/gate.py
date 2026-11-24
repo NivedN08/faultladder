@@ -114,8 +114,8 @@ def check(results: str | Path) -> tuple[dict[str, Any], str]:
         f"Ladder {default['ladder']}, {default['episodes_per_cell']} episodes per "
         f"cell. G1, G4 and G6 use the default policy of training seed "
         f"{default['train_seed']}; G3 and G5 use training seeds {seeds}. "
-        "The seed spread in G3 is the larger of the two baselines' standard deviations across seeds; G5 uses the mean across "
-        "seeds.",
+        "The seed spread in G3 is the larger of the two baselines' standard "
+        "deviations across seeds; G5 uses the mean across seeds.",
         "",
         "Every row is recomputed from the saved runs by "
         "`uv run python -m faultladder.gate`. The last column is the command that "
