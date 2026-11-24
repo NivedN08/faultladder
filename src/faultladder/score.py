@@ -129,7 +129,8 @@ def baseline_gates(
     """Gates G3 and G5, which need the trained baselines.
 
     ``nodr`` and ``wide`` are FaultLadder scores, one per seed. The seed spread
-    is the larger of their two standard deviations. ``privileged_level3`` maps
+    is the larger of their two standard deviations, so G3 needs at least two
+    seeds of each. ``privileged_level3`` maps
     each axis to the privileged policy's level-3 success, one per seed.
     """
     gap = _mean(wide) - _mean(nodr)
@@ -140,7 +141,9 @@ def baseline_gates(
         "G3": {
             "condition": f"wide - no randomisation >= {G3_GAP} and > 2 x seed spread",
             "value": {"gap": gap, "seed_spread": seed_spread},
-            "passed": gap >= G3_GAP - _EPS and gap > 2 * seed_spread,
+            "passed": min(len(nodr), len(wide)) >= 2
+            and gap >= G3_GAP - _EPS
+            and gap > 2 * seed_spread,
         },
         "G5": {
             "condition": f"privileged level 3 >= {G5_LEVEL3} per axis",

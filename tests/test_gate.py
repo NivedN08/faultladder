@@ -73,6 +73,14 @@ def test_g3_fails_when_the_gap_is_within_seed_spread(tmp_path):
     assert not g3["passed"]
 
 
+def test_g3_fails_with_a_single_seed(tmp_path):
+    root = _results(tmp_path, [1.0, 0.9, 0.8, 0.5, 0.3])
+    for seed in (1, 2):
+        (root / f"ppo_wide_seed{seed}" / "ladder.json").unlink()
+        (root / f"ppo_wide_seed{seed}").rmdir()
+    assert not check(root)[0]["checks"]["G3"]["passed"]
+
+
 def test_g5_fails_when_level_3_is_unsolved(tmp_path):
     result, _ = check(_results(tmp_path, [1.0, 1.0, 0.4, 0.4, 0.4]))
     assert result["checks"]["G5"]["failing_axes"] == list(AXES)
