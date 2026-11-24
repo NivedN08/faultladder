@@ -45,6 +45,21 @@ MEMORY_PRICE_PER_GIB = 0.00000222
 
 # The GPU with the most environment steps per dollar in results/gpu_benchmark.json.
 TRAIN_GPU = "L4"
+# Modal takes the first of these it has capacity for. On 2026-11-24 four L4
+# jobs waited 30 minutes unscheduled; an A10 gives 13% fewer steps per dollar.
+TRAIN_GPUS = [TRAIN_GPU, "A10"]
+
+
+def current_gpu() -> str:
+    """The GPU type this container actually got, as a key of ``GPU_PRICE``."""
+    import torch
+
+    name = torch.cuda.get_device_name(0).upper()
+    for gpu in sorted(GPU_PRICE, key=len, reverse=True):
+        if gpu in name:
+            return gpu
+    raise RuntimeError(f"no price known for GPU {name!r}")
+
 
 # 1.2 times the iteration where the seed-0 baseline's reward levelled off; see
 # results/go1_baseline_curve.json.
@@ -111,7 +126,7 @@ def benchmark_l40s(iterations: int = 300, num_envs: int = NUM_ENVS) -> dict:
     return _benchmark("L40S", iterations, num_envs)
 
 
-@app.function(gpu=TRAIN_GPU, timeout=120 * MINUTES, volumes={RUNS: volume}, **_job)
+@app.function(gpu=TRAIN_GPUS, timeout=120 * MINUTES, volumes={RUNS: volume}, **_job)
 def train(
     task: str = BASE_TASK,
     seed: int = 0,
@@ -125,8 +140,8 @@ def train(
     result = baseline.train(
         task, seed, iterations, log_dir, num_envs, "cuda:0", on_save=volume.commit
     )
-    result["gpu"] = TRAIN_GPU
-    result["price_per_second"] = price_per_second(TRAIN_GPU)
+    result["gpu"] = current_gpu()
+    result["price_per_second"] = price_per_second(result["gpu"])
     result["train_cost_usd"] = result["train_seconds"] * result["price_per_second"]
     previous = log_dir / "train.json"
     history = json.loads(previous.read_text()) if previous.exists() else []
@@ -155,7 +170,7 @@ def render(
     return on_volume
 
 
-@app.function(gpu=TRAIN_GPU, timeout=60 * MINUTES, volumes={RUNS: volume}, **_job)
+@app.function(gpu=TRAIN_GPUS, timeout=60 * MINUTES, volumes={RUNS: volume}, **_job)
 def evaluate(
     name: str,
     agent: str = "ppo",
@@ -196,8 +211,8 @@ def evaluate(
         baseline=baseline if agent == "ppo" else agent,
     )
     report["train_seed"] = seed if agent == "ppo" else None
-    report["gpu"] = TRAIN_GPU
-    report["cost_usd"] = report["wall_seconds"] * price_per_second(TRAIN_GPU)
+    report["gpu"] = current_gpu()
+    report["cost_usd"] = report["wall_seconds"] * price_per_second(report["gpu"])
     volume.commit()
     return report
 
@@ -245,7 +260,11 @@ def baselines(
         ]
         for (name, seed), call in zip(batch, calls, strict=True):
             result = call.get()
-            print(f"trained {name} seed {seed}: ${result['train_cost_usd']:.2f}")
+            print(
+                f"trained {name} seed {seed} on {result['gpu']}: "
+                f"${result['train_cost_usd']:.2f}",
+                flush=True,
+            )
         calls = [
             evaluate.spawn(f"ppo_{name}_seed{seed}", "ppo", name, seed)
             for name, seed in batch
@@ -257,7 +276,8 @@ def baselines(
             path.write_text(json.dumps(report, indent=2) + "\n")
             print(
                 f"scored {name} seed {seed}: {report['scores']['faultladder']:.3f} "
-                f"(${report['cost_usd']:.2f})"
+                f"(${report['cost_usd']:.2f})",
+                flush=True,
             )
 
 
