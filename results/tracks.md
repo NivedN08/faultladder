@@ -8,6 +8,7 @@ Predicted is the success expected if the two faults hurt independently, from the
 
 | Policy | Seeds | Compound | Predicted | Interaction |
 | --- | --- | --- | --- | --- |
+| PPO wide, recurrent | 5 | 0.976 ± 0.007 | 0.999 ± 0.001 | -0.023 ± 0.006 |
 | PPO privileged | 5 | 0.974 ± 0.006 | 0.998 ± 0.000 | -0.024 ± 0.006 |
 | PPO wide | 5 | 0.940 ± 0.018 | 0.985 ± 0.011 | -0.046 ± 0.007 |
 | PPO default | 5 | 0.689 ± 0.034 | 0.787 ± 0.034 | -0.098 ± 0.011 |
@@ -15,26 +16,26 @@ Predicted is the success expected if the two faults hurt independently, from the
 
 ### Interaction per pair (compound minus predicted, both levels)
 
-| Pair | PPO privileged | PPO wide | PPO default | PPO no randomisation |
-| --- | --- | --- | --- | --- |
-| latency + push | -0.091 | -0.134 | -0.208 | -0.516 |
-| payload + push | -0.016 | -0.111 | -0.359 | -0.412 |
-| motor_calf + payload | -0.012 | -0.117 | -0.386 | -0.288 |
-| motor_calf + push | -0.072 | -0.163 | -0.247 | -0.292 |
-| friction + push | -0.058 | -0.025 | -0.108 | -0.277 |
-| motor_hip + push | -0.088 | -0.090 | -0.128 | -0.148 |
-| motor_thigh + push | -0.047 | -0.111 | -0.075 | -0.189 |
-| payload + latency | -0.019 | -0.017 | -0.091 | -0.190 |
-| motor_calf + latency | -0.012 | -0.006 | -0.091 | -0.179 |
-| motor_thigh + payload | -0.001 | -0.026 | -0.054 | -0.129 |
-| motor_hip + payload | -0.002 | -0.005 | -0.124 | -0.058 |
-| friction + latency | -0.001 | -0.003 | +0.060 | -0.238 |
-| payload + friction | +0.000 | +0.001 | +0.003 | -0.128 |
-| motor_hip + latency | -0.009 | -0.013 | -0.008 | -0.066 |
-| motor_calf + friction | -0.001 | +0.011 | +0.042 | -0.139 |
-| motor_thigh + latency | -0.005 | -0.010 | +0.007 | -0.066 |
-| motor_hip + friction | -0.001 | -0.000 | -0.002 | -0.020 |
-| motor_thigh + friction | -0.000 | +0.000 | -0.000 | +0.009 |
+| Pair | PPO wide, recurrent | PPO privileged | PPO wide | PPO default | PPO no randomisation |
+| --- | --- | --- | --- | --- | --- |
+| latency + push | -0.150 | -0.091 | -0.134 | -0.208 | -0.516 |
+| payload + push | -0.016 | -0.016 | -0.111 | -0.359 | -0.412 |
+| motor_calf + push | -0.064 | -0.072 | -0.163 | -0.247 | -0.292 |
+| motor_calf + payload | -0.006 | -0.012 | -0.117 | -0.386 | -0.288 |
+| motor_hip + push | -0.051 | -0.088 | -0.090 | -0.128 | -0.148 |
+| friction + push | -0.033 | -0.058 | -0.025 | -0.108 | -0.277 |
+| motor_thigh + push | -0.044 | -0.047 | -0.111 | -0.075 | -0.189 |
+| payload + latency | -0.009 | -0.019 | -0.017 | -0.091 | -0.190 |
+| motor_calf + latency | -0.022 | -0.012 | -0.006 | -0.091 | -0.179 |
+| motor_thigh + payload | -0.002 | -0.001 | -0.026 | -0.054 | -0.129 |
+| motor_hip + payload | -0.002 | -0.002 | -0.005 | -0.124 | -0.058 |
+| friction + latency | -0.007 | -0.001 | -0.003 | +0.060 | -0.238 |
+| payload + friction | +0.000 | +0.000 | +0.001 | +0.003 | -0.128 |
+| motor_hip + latency | -0.003 | -0.009 | -0.013 | -0.008 | -0.066 |
+| motor_calf + friction | -0.008 | -0.001 | +0.011 | +0.042 | -0.139 |
+| motor_thigh + latency | -0.004 | -0.005 | -0.010 | +0.007 | -0.066 |
+| motor_hip + friction | -0.000 | -0.001 | -0.000 | -0.002 | -0.020 |
+| motor_thigh + friction | -0.000 | -0.000 | +0.000 | -0.000 | +0.009 |
 
 ## Onset: a motor fault that starts mid-episode
 
@@ -42,6 +43,7 @@ The fault appears 5 s into the episode; static is the same cells with the fault 
 
 | Policy | Seeds | Onset | Static | Gap |
 | --- | --- | --- | --- | --- |
+| PPO wide, recurrent | 5 | 0.839 ± 0.006 | 0.837 ± 0.006 | -0.002 ± 0.001 |
 | PPO privileged | 5 | 0.815 ± 0.012 | 0.811 ± 0.013 | -0.004 ± 0.002 |
 | PPO wide | 5 | 0.802 ± 0.011 | 0.796 ± 0.012 | -0.005 ± 0.001 |
 | PPO default | 5 | 0.748 ± 0.013 | 0.745 ± 0.014 | -0.004 ± 0.001 |

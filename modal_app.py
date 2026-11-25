@@ -80,6 +80,9 @@ image = (
     .add_local_file(
         "src/faultladder/ladder_v1.json", "/root/faultladder/ladder_v1.json"
     )
+    .add_local_file(
+        "src/faultladder/ladder_g1_v0.json", "/root/faultladder/ladder_g1_v0.json"
+    )
 )
 app = modal.App("faultladder", image=image)
 volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
