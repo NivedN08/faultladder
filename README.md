@@ -69,7 +69,7 @@ uv run python -m faultladder.evaluate --agent ppo \
   --checkpoint ppo_default_seed0.pt --out results/mine --device cuda:0
 ```
 
-One 10 s video per axis at level 3 (written to `scratch/videos`):
+A no-fault video and one 10 s video per axis at level 3 (written to `scratch/videos`):
 
 ```sh
 uv run modal run modal_app.py::videos --baseline default --seed 0

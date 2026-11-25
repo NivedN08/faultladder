@@ -459,16 +459,16 @@ def videos(
     seconds: float = 10.0,
     out: str = "scratch/videos",
 ):
-    """Render one video per axis at ``level`` and download them to ``out``."""
+    """Render a no-fault video and one per axis at ``level``, saved to ``out``."""
     from faultladder.score import AXES
     from faultladder.tasks import BASELINES
 
     entry = BASELINES[baseline]
     run = f"{entry.train_task}/seed{seed}"
-    cells = [f"{axis}/{level}" for axis in AXES]
+    cells = ["", *(f"{axis}/{level}" for axis in AXES)]
     calls = [render.spawn(run, "", entry.eval_task, seconds, cell) for cell in cells]
     Path(out).mkdir(parents=True, exist_ok=True)
     for cell, call in zip(cells, calls, strict=True):
-        path = Path(out) / f"{baseline}_{cell.replace('/', '_')}.mp4"
+        path = Path(out) / f"{baseline}_{cell.replace('/', '_') or 'nominal'}.mp4"
         path.write_bytes(b"".join(volume.read_file(call.get())))
         print(f"wrote {path}", flush=True)
