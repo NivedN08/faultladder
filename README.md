@@ -59,11 +59,20 @@ your own policy, pass its rsl_rl checkpoint as `--weights`; it must use the
 observations and actions of mjlab's `Mjlab-Velocity-Flat-Unitree-Go1` task
 (add `--robot g1` for `Mjlab-Velocity-Flat-Unitree-G1`).
 
+A checkpoint is a PyTorch pickle file and can run code when loaded, so only
+score checkpoints from a source you trust.
+
 On a machine with its own GPU, without Modal:
 
 ```sh
 uv run python -m faultladder.evaluate --agent ppo \
   --checkpoint ppo_default_seed0.pt --out results/mine --device cuda:0
+```
+
+A no-fault video and one 10 s video per axis at level 3 (written to `scratch/videos`):
+
+```sh
+uv run modal run modal_app.py::videos --baseline default --seed 0
 ```
 
 To train and score the baselines yourself (about $0.80 per Go1 policy):

@@ -19,7 +19,8 @@ from mjlab.tasks.registry import load_env_cfg, load_rl_cfg, load_runner_cls
 from mjlab.utils.torch import configure_torch_backends
 from mjlab.utils.wrappers import VideoRecorder
 
-import faultladder.tasks  # noqa: F401  (registers the FaultLadder tasks)
+from faultladder import ladder
+from faultladder.tasks import TASK_ROBOT  # importing registers the tasks
 
 BASE_TASK = "Mjlab-Velocity-Flat-Unitree-Go1"
 SAVE_INTERVAL = 100
@@ -187,12 +188,19 @@ def render(
     num_envs: int = 4,
     device: str = "cuda:0",
     seed: int = 0,
+    cell: str = "",
 ) -> Path:
-    """Roll out ``checkpoint`` in the task's play setup and save an mp4."""
+    """Roll out ``checkpoint`` in the task's play setup and save an mp4.
+
+    ``cell`` (e.g. ``push/3``) applies that ladder cell; ``task`` must then be
+    an evaluation task.
+    """
     checkpoint = Path(checkpoint)
     if not checkpoint.is_file():
         raise FileNotFoundError(f"checkpoint not found: {checkpoint}")
     prefix = f"{checkpoint.parent.name}-{checkpoint.stem}"
+    if cell:
+        prefix += "-" + cell.replace("/", "_")
     steps = 0
 
     def record(env: ManagerBasedRlEnv) -> ManagerBasedRlEnv:
@@ -214,8 +222,11 @@ def render(
         str(checkpoint), load_cfg={"actor": True}, strict=True, map_location=device
     )
     policy = runner.get_inference_policy(device=device)
-    runner.env.reset()
+    if cell:
+        axis, level = cell.split("/")
+        ladder.set_cell(env.unwrapped, ladder.cell(axis, int(level), TASK_ROBOT[task]))
     with torch.inference_mode():
+        runner.env.reset()
         for _ in range(steps):
             runner.env.step(policy(runner.env.get_observations()))
     env.close()
