@@ -1,6 +1,6 @@
 # FaultLadder validity gates
 
-Ladder v1, 4096 episodes per cell. G1, G4 and G6 use the default policy of training seed 0; G3 and G5 use training seeds 0, 1, 2, 3, 4. The seed spread in G3 is the larger of the two baselines' standard deviations across seeds; G5 uses the mean across seeds.
+Unitree Go1, ladder v1, 4096 episodes per cell. G1, G4 and G6 use the default policy of training seed 0; G3 and G5 use training seeds 0, 1, 2, 3, 4. The seed spread in G3 is the larger of the two baselines' standard deviations across seeds; G5 uses the mean across seeds.
 
 Every row is recomputed from the saved runs by `uv run python -m faultladder.gate`. The last column is the command that produced those runs.
 

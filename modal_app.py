@@ -181,11 +181,13 @@ def evaluate(
     eval_seed: int = 0,
     num_envs: int = 0,
     only: str = "",
+    weights: bytes = b"",
 ) -> dict:
     """Score an agent on the ladder; writes ``eval/<name>/ladder.json``.
 
     A PPO agent is the newest checkpoint of ``baseline`` trained with ``seed``
-    unless ``run`` (a directory on the volume) or ``checkpoint`` say otherwise.
+    unless ``run`` (a directory on the volume), ``checkpoint`` or ``weights``
+    (the bytes of a checkpoint file) say otherwise.
     """
     from faultladder import baseline as fl_baseline
     from faultladder import evaluate as fl_evaluate
@@ -193,7 +195,11 @@ def evaluate(
 
     path = None
     task = BASELINES[baseline].eval_task
-    if agent == "ppo":
+    if agent == "ppo" and weights:
+        path = Path(RUNS) / "eval" / name / "model.pt"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(weights)
+    elif agent == "ppo":
         run = run or f"{BASELINES[baseline].train_task}/seed{seed}"
         log_dir = Path(RUNS) / run
         if checkpoint:
@@ -337,8 +343,12 @@ def ladder(
     only: str = "",
     out: str = "results",
     robot: str = "go1",
+    weights: str = "",
 ):
-    """Score an agent on Modal and save ``<out>/<name>/ladder.json`` locally."""
+    """Score an agent on Modal and save ``<out>/<name>/ladder.json`` locally.
+
+    ``weights`` is a checkpoint file on this machine, scored as ``baseline``.
+    """
     prefix, results = _robot(robot, out)
     report = evaluate.remote(
         prefix + name,
@@ -350,6 +360,7 @@ def ladder(
         eval_seed,
         num_envs,
         only,
+        Path(weights).read_bytes() if weights else b"",
     )
     path = results / name / "ladder.json"
     path.parent.mkdir(parents=True, exist_ok=True)

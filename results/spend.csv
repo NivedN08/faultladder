@@ -17,3 +17,6 @@ date,phase,job,gpu,seconds,cost_usd,note
 2026-11-24,4,train + score recurrent x5 seeds,A10,,4.68,in-job cost summed
 2026-11-24,4,rescore 20 runs + default rescore with tolerance multiples,A10,,4.49,in-job cost summed
 2026-11-24,4,onset and compound tracks: 20 runs + 3 pilot,A10,,10.48,in-job cost summed
+2026-11-24,4,recurrent x5 seeds on the tracks,A10,,2.19,in-job cost summed
+2026-11-24,5,G1 pilot + train and score 4 baselines x3 seeds (cost of the last attempt of each job only),A10,,34.54,in-job cost summed
+2026-11-24,5,G1 zero + random + default rescore,A10,,1.36,in-job cost summed
