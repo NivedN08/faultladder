@@ -157,13 +157,17 @@ def render(
     checkpoint: str = "",
     task: str = BASE_TASK,
     seconds: float = 20.0,
+    cell: str = "",
 ) -> str:
-    """Save a video of a checkpoint (default: the newest) next to the run."""
+    """Save a video of a checkpoint (default: the newest) next to the run.
+
+    ``cell`` (e.g. ``push/3``) applies a ladder cell; pass an evaluation task.
+    """
     from faultladder import baseline
 
     log_dir = Path(RUNS) / run
     path = log_dir / checkpoint if checkpoint else baseline.checkpoints(log_dir)[0]
-    video = baseline.render(task, path, log_dir / "videos", seconds)
+    video = baseline.render(task, path, log_dir / "videos", seconds, cell=cell)
     volume.commit()
     on_volume = str(video.relative_to(RUNS))
     print(f"video on the {VOLUME_NAME} volume: {on_volume}")
@@ -445,3 +449,26 @@ def bench(
     }
     Path(out).write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2))
+
+
+@app.local_entrypoint()
+def videos(
+    baseline: str = "default",
+    seed: int = 0,
+    level: int = 3,
+    seconds: float = 10.0,
+    out: str = "scratch/videos",
+):
+    """Render one video per axis at ``level`` and download them to ``out``."""
+    from faultladder.score import AXES
+    from faultladder.tasks import BASELINES
+
+    entry = BASELINES[baseline]
+    run = f"{entry.train_task}/seed{seed}"
+    cells = [f"{axis}/{level}" for axis in AXES]
+    calls = [render.spawn(run, "", entry.eval_task, seconds, cell) for cell in cells]
+    Path(out).mkdir(parents=True, exist_ok=True)
+    for cell, call in zip(cells, calls, strict=True):
+        path = Path(out) / f"{baseline}_{cell.replace('/', '_')}.mp4"
+        path.write_bytes(b"".join(volume.read_file(call.get())))
+        print(f"wrote {path}", flush=True)
