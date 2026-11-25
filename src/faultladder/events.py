@@ -5,6 +5,8 @@ idempotent: it first restores the model defaults for ``env_ids`` and then
 applies its perturbation, so calling it with the nominal value undoes it.
 """
 
+import re
+
 import torch
 from mjlab.entity import Entity
 from mjlab.envs import ManagerBasedRlEnv
@@ -12,8 +14,26 @@ from mjlab.managers.event_manager import RecomputeLevel, requires_model_fields
 from mjlab.utils.lab_api.math import matrix_from_quat, quat_apply_yaw, quat_from_matrix
 
 MOTOR_TYPES = ("hip", "thigh", "calf")
-FOOT_GEOMS = ("^[FR][LR]_foot_collision$",)
+# Joints behind each motor axis. On the Go1 these are the hip, thigh and calf
+# joints of the four legs; on the G1 humanoid the three leg joint groups from
+# the top down: hips (pitch, roll, yaw), knees and ankles (pitch, roll).
+MOTOR_JOINTS = {
+    "hip": r".*_hip(_pitch|_roll|_yaw)?_joint",
+    "thigh": r".*_(thigh|knee)_joint",
+    "calf": r".*_(calf|ankle_pitch|ankle_roll)_joint",
+}
+FOOT_GEOMS = (r"^([FR][LR]_foot_collision|(left|right)_foot\d_collision)$",)
 ROBOT = "robot"
+# The body that carries the payload: the G1's torso, else the root (Go1 trunk).
+PAYLOAD_BODIES = ("torso_link",)
+
+
+def payload_body(asset: Entity) -> int:
+    """Global id of the body the payload is attached to."""
+    for name in PAYLOAD_BODIES:
+        if name in asset.body_names:
+            return int(asset.indexing.body_ids[asset.body_names.index(name)])
+    return int(asset.indexing.root_body_id)
 
 
 def _env_ids(env: ManagerBasedRlEnv, env_ids: torch.Tensor | None) -> torch.Tensor:
@@ -23,7 +43,7 @@ def _env_ids(env: ManagerBasedRlEnv, env_ids: torch.Tensor | None) -> torch.Tens
 
 
 def motor_ctrl_ids(asset: Entity, joint_type: str) -> torch.Tensor:
-    """Global control indices of the four joints of one type, e.g. the hips."""
+    """Global control indices of the joints of one type, e.g. the hips."""
     if joint_type not in MOTOR_TYPES:
         raise ValueError(f"joint_type must be one of {MOTOR_TYPES}, got {joint_type!r}")
     ids = [
@@ -32,7 +52,7 @@ def motor_ctrl_ids(asset: Entity, joint_type: str) -> torch.Tensor:
         for name, ctrl_id in zip(
             actuator.target_names, actuator.global_ctrl_ids.tolist(), strict=True
         )
-        if name.endswith(f"_{joint_type}_joint")
+        if re.fullmatch(MOTOR_JOINTS[joint_type], name)
     ]
     return torch.tensor(ids, device=asset.data.device)
 
@@ -115,7 +135,7 @@ def payload(
     asset: Entity = env.scene[ROBOT]
     model = env.sim.model
     bodies = asset.indexing.body_ids
-    trunk = int(asset.indexing.root_body_id)
+    trunk = payload_body(asset)
     mass0 = env.sim.get_default_field("body_mass")
     ipos0 = env.sim.get_default_field("body_ipos")[trunk]
     inertia0 = env.sim.get_default_field("body_inertia")[trunk]
@@ -161,9 +181,9 @@ def payload(
 def foot_friction(
     env: ManagerBasedRlEnv, env_ids: torch.Tensor | None, coefficient: float | None
 ) -> None:
-    """Set the sliding friction of all four feet; ``None`` restores the model's.
+    """Set the sliding friction of every foot; ``None`` restores the model's.
 
-    The Go1 feet have contact priority over the floor, so this is the
+    The feet have contact priority over the floor, so this is the
     foot-to-floor coefficient.
     """
     ids = _env_ids(env, env_ids)
@@ -212,7 +232,7 @@ def train_faults(
 ) -> None:
     """Training randomisation: a weak motor and a command delay per episode.
 
-    With probability ``motor_prob`` one of the twelve motors gets a strength
+    With probability ``motor_prob`` one of the robot's motors gets a strength
     drawn from ``[min_strength, 1]``; the delay is 0 to ``max_latency_steps``
     control steps, in whole physics steps. Both are redrawn at every reset.
     """
@@ -233,14 +253,14 @@ def train_faults(
 def fault_parameters(env: ManagerBasedRlEnv) -> torch.Tensor:
     """Privileged observation: the fault parameters, one row per environment.
 
-    Twelve motor strengths, added trunk mass over nominal robot mass, sideways
+    Every motor's strength, added trunk mass over nominal robot mass, sideways
     shift of the trunk's centre of mass (m), foot friction and command delay
     (control steps). Pushes are instantaneous and have no parameter to report.
     """
     asset: Entity = env.scene[ROBOT]
     model = env.sim.model
     ctrl = asset.indexing.ctrl_ids
-    trunk = int(asset.indexing.root_body_id)
+    trunk = payload_body(asset)
     gain0 = env.sim.get_default_field("actuator_gainprm")[ctrl, 0]
     mass0 = env.sim.get_default_field("body_mass")
     ipos0 = env.sim.get_default_field("body_ipos")[trunk, 1]
