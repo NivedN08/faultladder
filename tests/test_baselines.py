@@ -1,12 +1,14 @@
 """The four training configurations of Phase 4."""
 
+from typing import Any
+
 import pytest
 import torch
 from mjlab.envs import ManagerBasedRlEnv
-from mjlab.tasks.registry import load_env_cfg
+from mjlab.tasks.registry import load_env_cfg, load_rl_cfg
 from mjlab.utils.lab_api.math import quat_apply_yaw
 
-from faultladder import events, ladder
+from faultladder import baseline, evaluate, events, ladder
 from faultladder.baseline import BASE_TASK
 from faultladder.ladder import Cell
 from faultladder.tasks import BASE_RANDOMISATION, BASELINES, EVAL_PRIVILEGED_TASK
@@ -175,3 +177,27 @@ def test_privileged_eval_reports_the_cell_being_run():
         nominal[:, [12, 13, 15]], torch.zeros(4, 3), atol=1e-6, rtol=0
     )
     env.close()
+
+
+def test_recurrent_baseline_trains_and_is_scored_with_its_memory(tmp_path):
+    recurrent = BASELINES["recurrent"]
+    rl_cfg: Any = load_rl_cfg(recurrent.train_task)
+    wide_cfg: Any = load_rl_cfg(BASELINES["wide"].train_task)
+    assert rl_cfg.actor.class_name == "RNNModel" and rl_cfg.actor.rnn_type == "lstm"
+    assert wide_cfg.actor.rnn_type is None
+    baseline.train(recurrent.train_task, 0, 2, tmp_path, num_envs=4, device="cpu")
+    env, wrapped = evaluate.make_env(4, "cpu", 0, recurrent.eval_task)
+    policy: Any = evaluate.make_policy(
+        "ppo", wrapped, tmp_path / "model_1.pt", "cpu", 0, recurrent.eval_task
+    )
+    commands = torch.tensor([[0.8, 0.0, 0.0]]).repeat(4, 1)
+    nominal = ladder.nominal_cell()
+    with torch.inference_mode():
+        evaluate.run_cell(env, wrapped, policy, nominal, commands, 0, 0.4, 0.2)
+        long_memory = policy.rnn.hidden_state[0].clone()
+        evaluate.run_cell(env, wrapped, policy, nominal, commands, 0, 0.02, 0.02)
+        one_step = policy.rnn.hidden_state[0].clone()
+    env.close()
+    assert long_memory.abs().sum() > 0
+    # A new episode starts from an empty memory, not the last episode's.
+    assert not torch.allclose(one_step, long_memory)

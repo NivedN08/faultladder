@@ -14,3 +14,6 @@ date,phase,job,gpu,seconds,cost_usd,note
 2026-11-24,4,zero + random + rescore (ladder round 2),A10,,0.74,in-job cost summed
 2026-11-24,4,rescore all 15 runs on frozen ladder v1,A10,,3.31,in-job cost summed; same levels as round 2 with the version label v1
 2026-11-24,4,retrain wide + privileged x5 seeds and train nodr + default seeds 3-4; score all 14,A10,,10.84,in-job cost summed
+2026-11-24,4,train + score recurrent x5 seeds,A10,,4.68,in-job cost summed
+2026-11-24,4,rescore 20 runs + default rescore with tolerance multiples,A10,,4.49,in-job cost summed
+2026-11-24,4,onset and compound tracks: 20 runs + 3 pilot,A10,,10.48,in-job cost summed

@@ -219,6 +219,102 @@ def evaluate(
     return report
 
 
+@app.function(gpu=TRAIN_GPUS, timeout=90 * MINUTES, volumes={RUNS: volume}, **_job)
+def evaluate_tracks(
+    name: str,
+    agent: str = "ppo",
+    baseline: str = "default",
+    seed: int = 0,
+    eval_seed: int = 0,
+    num_envs: int = 0,
+) -> dict:
+    """Score an agent on the onset and compound tracks; ``eval/<name>/tracks.json``."""
+    from faultladder import baseline as fl_baseline
+    from faultladder import tracks as fl_tracks
+    from faultladder.tasks import BASELINES, EVAL_TASK
+
+    path = None
+    task = EVAL_TASK
+    if agent == "ppo":
+        task = BASELINES[baseline].eval_task
+        log_dir = Path(RUNS) / BASELINES[baseline].train_task / f"seed{seed}"
+        path = fl_baseline.checkpoints(log_dir)[0]
+    report = fl_tracks.evaluate(
+        agent,
+        Path(RUNS) / "eval" / name,
+        checkpoint=path,
+        num_envs=num_envs or None,
+        device="cuda:0",
+        seed=eval_seed,
+        task=task,
+        baseline=baseline if agent == "ppo" else agent,
+    )
+    report["train_seed"] = seed if agent == "ppo" else None
+    report["gpu"] = current_gpu()
+    report["cost_usd"] = report["wall_seconds"] * price_per_second(report["gpu"])
+    volume.commit()
+    return report
+
+
+@app.local_entrypoint()
+def tracks(
+    names: str = "nodr,default,wide,privileged",
+    seeds: str = "0,1,2,3,4",
+    agents: str = "",
+    out: str = "results",
+):
+    """Score baselines and seeds (or ``agents``, e.g. zero,random) on the tracks."""
+    jobs = [
+        (f"ppo_{name}_seed{seed}", "ppo", name, int(seed))
+        for seed in seeds.split(",")
+        for name in names.split(",")
+        if name
+    ] + [(agent, agent, "default", 0) for agent in agents.split(",") if agent]
+    for start in range(0, len(jobs), 8):
+        batch = jobs[start : start + 8]
+        calls = [evaluate_tracks.spawn(*job) for job in batch]
+        for job, call in zip(batch, calls, strict=True):
+            report = call.get()
+            path = Path(out) / job[0] / "tracks.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(report, indent=2) + "\n")
+            scores = report["scores"]
+            print(
+                f"{job[0]}: onset {scores['onset']['onset']:.3f} "
+                f"(static {scores['onset']['static']:.3f}), "
+                f"compound {scores['compound']['compound']:.3f} "
+                f"(predicted {scores['compound']['predicted']:.3f}), "
+                f"${report['cost_usd']:.2f}",
+                flush=True,
+            )
+
+
+@app.local_entrypoint()
+def scores(
+    names: str = "nodr,default,wide,privileged,recurrent",
+    seeds: str = "0,1,2,3,4",
+    out: str = "results",
+):
+    """Score already trained baselines and seeds on the ladder, eight at a time."""
+    jobs = [(name, int(seed)) for seed in seeds.split(",") for name in names.split(",")]
+    for start in range(0, len(jobs), 8):
+        batch = jobs[start : start + 8]
+        calls = [
+            evaluate.spawn(f"ppo_{name}_seed{seed}", "ppo", name, seed)
+            for name, seed in batch
+        ]
+        for (name, seed), call in zip(batch, calls, strict=True):
+            report = call.get()
+            path = Path(out) / f"ppo_{name}_seed{seed}" / "ladder.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(report, indent=2) + "\n")
+            print(
+                f"scored {name} seed {seed}: "
+                f"{report['scores']['faultladder']:.3f} (${report['cost_usd']:.2f})",
+                flush=True,
+            )
+
+
 @app.local_entrypoint()
 def ladder(
     name: str,

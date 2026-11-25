@@ -24,6 +24,10 @@ NUM_LEVELS = 5
 LIN_TOL = 0.25  # m/s, mean planar velocity error over the scored window
 ANG_TOL = 0.5  # rad/s, mean yaw-rate error over the scored window
 
+# Multiples of both tolerances at which every cell is also scored, to check
+# that the ranking of policies does not hinge on the tolerances chosen.
+TOLERANCE_SCALES = (0.5, 0.75, 1.0, 1.5, 2.0)
+
 G1_NOMINAL = 0.95
 G2_FLOOR = 0.05
 G4_LEVEL1 = 0.8
@@ -35,14 +39,18 @@ _EPS = 1e-9  # tolerance for comparisons that sit exactly on a threshold
 
 
 def episode_success(
-    fell: torch.Tensor, lin_err: torch.Tensor, ang_err: torch.Tensor
+    fell: torch.Tensor,
+    lin_err: torch.Tensor,
+    ang_err: torch.Tensor,
+    scale: float = 1.0,
 ) -> torch.Tensor:
     """An episode succeeds if the robot never fell and tracked its command.
 
     ``lin_err`` and ``ang_err`` are each episode's mean error over the scored
-    window (the last 8 s of a 10 s episode).
+    window (the last 8 s of a 10 s episode). ``scale`` multiplies both
+    tolerances; the FaultLadder score uses 1.
     """
-    return ~fell & (lin_err <= LIN_TOL) & (ang_err <= ANG_TOL)
+    return ~fell & (lin_err <= scale * LIN_TOL) & (ang_err <= scale * ANG_TOL)
 
 
 def cell_score(success: torch.Tensor) -> float:
@@ -153,3 +161,87 @@ def baseline_gates(
         },
     }
     return {"checks": checks, "passed": all(c["passed"] for c in checks.values())}
+
+
+MOTOR_AXES = ("motor_hip", "motor_thigh", "motor_calf")
+
+
+def onset_scores(
+    static: dict[str, list[float]], onset: dict[str, list[float]]
+) -> dict[str, Any]:
+    """Onset track: motor faults that start mid-episode.
+
+    ``static`` and ``onset`` hold the five cell scores of each motor axis with
+    the fault present from the start and appearing mid-episode, scored over
+    the same window. ``onset`` is the track score; ``gap`` is how much a fault
+    costs by arriving while the robot walks.
+    """
+    for scores in (static, onset):
+        if set(scores) != set(MOTOR_AXES):
+            raise ValueError(f"expected axes {MOTOR_AXES}, got {tuple(scores)}")
+        if any(len(levels) != NUM_LEVELS for levels in scores.values()):
+            raise ValueError(f"every axis needs {NUM_LEVELS} levels")
+    axes = {
+        axis: {"static": _mean(static[axis]), "onset": _mean(onset[axis])}
+        for axis in MOTOR_AXES
+    }
+    static_mean = _mean([a["static"] for a in axes.values()])
+    onset_mean = _mean([a["onset"] for a in axes.values()])
+    return {
+        "onset": onset_mean,
+        "static": static_mean,
+        "gap": static_mean - onset_mean,
+        "axes": axes,
+    }
+
+
+def compound_prediction(single_a: float, single_b: float, nominal: float) -> float:
+    """Success expected under two faults if they hurt independently.
+
+    Each fault keeps a fraction ``single / nominal`` of the nominal successes;
+    independent faults keep the product of the two fractions.
+    """
+    if nominal <= 0.0:
+        return 0.0
+    return min(single_a, single_b, single_a * single_b / nominal)
+
+
+def compound_scores(pairs: list[dict[str, float]], nominal: float) -> dict[str, float]:
+    """Compound track: two axes perturbed together.
+
+    Each pair has the ``observed`` success and the two single-fault successes
+    ``single_a`` and ``single_b``. ``compound`` is the track score;
+    ``interaction`` is observed minus predicted, negative when two faults
+    together are worse than their separate effects predict.
+    """
+    if not pairs:
+        raise ValueError("no compound cells")
+    observed = _mean([p["observed"] for p in pairs])
+    predicted = _mean(
+        [compound_prediction(p["single_a"], p["single_b"], nominal) for p in pairs]
+    )
+    return {
+        "compound": observed,
+        "predicted": predicted,
+        "interaction": observed - predicted,
+    }
+
+
+def interval(values: list[float]) -> float:
+    """Half-width of the 95% confidence interval of the mean across seeds."""
+    # Two-sided Student t quantiles at 0.975 for 1 to 9 degrees of freedom.
+    t = (12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262)
+    n = len(values)
+    if n < 2:
+        return 0.0
+    quantile = t[n - 2] if n - 2 < len(t) else 1.96
+    return quantile * spread(values) / n**0.5
+
+
+def rank_agreement(a: list[float], b: list[float]) -> float:
+    """Kendall's tau between two score lists over the same policies."""
+    pairs = [(i, j) for i in range(len(a)) for j in range(i + 1, len(a))]
+    if not pairs:
+        raise ValueError("ranking needs at least two policies")
+    sign = lambda x: (x > 0) - (x < 0)  # noqa: E731
+    return sum(sign(a[i] - a[j]) * sign(b[i] - b[j]) for i, j in pairs) / len(pairs)

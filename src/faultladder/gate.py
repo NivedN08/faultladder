@@ -15,7 +15,10 @@ BASELINES = {
     "default": "PPO default",
     "wide": "PPO wide",
     "privileged": "PPO privileged",
+    "recurrent": "PPO wide, recurrent",
 }
+# The baselines the gates are defined on; the others only join the leaderboard.
+GATE_BASELINES = ("nodr", "default", "wide", "privileged")
 COMMANDS = {
     "G1": "uv run modal run modal_app.py::baselines",
     "G2": "uv run modal run modal_app.py::ladder --agent zero (and --agent random)",
@@ -79,8 +82,8 @@ def check(results: str | Path) -> tuple[dict[str, Any], str]:
     """
     results = Path(results)
     runs = load_baselines(results)
-    for name, reports in runs.items():
-        if not reports:
+    for name in GATE_BASELINES:
+        if not runs[name]:
             raise ValueError(f"no ppo_{name}_seed* runs under {results}")
     default = runs["default"][0]
     again = load(results / f"ppo_default_seed{default['train_seed']}_rescore")
