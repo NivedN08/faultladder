@@ -10,9 +10,10 @@ from mjlab.envs import ManagerBasedRlEnv
 
 from faultladder.score import AXES, NUM_LEVELS
 
+# Every robot is scored on the same frozen levels.
 LADDER_FILES = {
     "go1": Path(__file__).with_name("ladder_v1.json"),
-    "g1": Path(__file__).with_name("ladder_g1_v0.json"),
+    "g1": Path(__file__).with_name("ladder_v1.json"),
 }
 NOMINAL = "nominal"
 
