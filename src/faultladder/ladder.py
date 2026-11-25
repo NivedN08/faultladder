@@ -10,7 +10,11 @@ from mjlab.envs import ManagerBasedRlEnv
 
 from faultladder.score import AXES, NUM_LEVELS
 
-LADDER_FILE = Path(__file__).with_name("ladder_v1.json")
+# Every robot is scored on the same frozen levels.
+LADDER_FILES = {
+    "go1": Path(__file__).with_name("ladder_v1.json"),
+    "g1": Path(__file__).with_name("ladder_v1.json"),
+}
 NOMINAL = "nominal"
 
 # Event term names in the FaultLadder tasks (see ``faultladder.tasks``).
@@ -37,8 +41,9 @@ class Cell:
 
 
 @cache
-def load(path: Path = LADDER_FILE) -> dict[str, Any]:
-    spec = json.loads(path.read_text())
+def load(robot: str = "go1") -> dict[str, Any]:
+    """The ladder of ``robot``."""
+    spec = json.loads(LADDER_FILES[robot].read_text())
     if tuple(spec["axes"]) != AXES:
         raise ValueError(f"ladder axes {tuple(spec['axes'])} do not match {AXES}")
     for axis, entry in spec["axes"].items():
@@ -51,10 +56,10 @@ def nominal_cell() -> Cell:
     return Cell(NOMINAL, 0, 0.0)
 
 
-def cells() -> list[Cell]:
+def cells(robot: str = "go1") -> list[Cell]:
     """The nominal cell followed by the 35 perturbed cells."""
     out = [nominal_cell()]
-    for axis, entry in load()["axes"].items():
+    for axis, entry in load(robot)["axes"].items():
         out += [Cell(axis, i + 1, value) for i, value in enumerate(entry["levels"])]
     return out
 
@@ -65,10 +70,9 @@ def event_params(*cells: Cell) -> dict[str, dict[str, Any]]:
     Cells must be on different axes, and at most one may be a motor axis: the
     motor event weakens one kind of joint.
     """
-    spec = load()
     params: dict[str, dict[str, Any]] = {
         MOTOR: {"joint_type": None, "strength": 1.0},
-        PAYLOAD: {"mass_fraction": 0.0, "max_offset": spec["payload_max_offset"]},
+        PAYLOAD: {"mass_fraction": 0.0},
         FRICTION: {"coefficient": None},
         LATENCY: {"steps": 0},
         PUSH: {"speed": 0.0},
@@ -100,9 +104,9 @@ def event_params(*cells: Cell) -> dict[str, dict[str, Any]]:
     return params
 
 
-def cell(axis: str, level: int) -> Cell:
+def cell(axis: str, level: int, robot: str = "go1") -> Cell:
     """The ladder cell of ``axis`` at ``level`` (1 to 5)."""
-    return Cell(axis, level, load()["axes"][axis]["levels"][level - 1])
+    return Cell(axis, level, load(robot)["axes"][axis]["levels"][level - 1])
 
 
 def set_cell(env: ManagerBasedRlEnv, *cells: Cell) -> None:

@@ -126,7 +126,7 @@ def benchmark_l40s(iterations: int = 300, num_envs: int = NUM_ENVS) -> dict:
     return _benchmark("L40S", iterations, num_envs)
 
 
-@app.function(gpu=TRAIN_GPUS, timeout=120 * MINUTES, volumes={RUNS: volume}, **_job)
+@app.function(gpu=TRAIN_GPUS, timeout=240 * MINUTES, volumes={RUNS: volume}, **_job)
 def train(
     task: str = BASE_TASK,
     seed: int = 0,
@@ -181,20 +181,25 @@ def evaluate(
     eval_seed: int = 0,
     num_envs: int = 0,
     only: str = "",
+    weights: bytes = b"",
 ) -> dict:
     """Score an agent on the ladder; writes ``eval/<name>/ladder.json``.
 
     A PPO agent is the newest checkpoint of ``baseline`` trained with ``seed``
-    unless ``run`` (a directory on the volume) or ``checkpoint`` say otherwise.
+    unless ``run`` (a directory on the volume), ``checkpoint`` or ``weights``
+    (the bytes of a checkpoint file) say otherwise.
     """
     from faultladder import baseline as fl_baseline
     from faultladder import evaluate as fl_evaluate
-    from faultladder.tasks import BASELINES, EVAL_TASK
+    from faultladder.tasks import BASELINES
 
     path = None
-    task = EVAL_TASK
-    if agent == "ppo":
-        task = BASELINES[baseline].eval_task
+    task = BASELINES[baseline].eval_task
+    if agent == "ppo" and weights:
+        path = Path(RUNS) / "eval" / name / "model.pt"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(weights)
+    elif agent == "ppo":
         run = run or f"{BASELINES[baseline].train_task}/seed{seed}"
         log_dir = Path(RUNS) / run
         if checkpoint:
@@ -231,12 +236,11 @@ def evaluate_tracks(
     """Score an agent on the onset and compound tracks; ``eval/<name>/tracks.json``."""
     from faultladder import baseline as fl_baseline
     from faultladder import tracks as fl_tracks
-    from faultladder.tasks import BASELINES, EVAL_TASK
+    from faultladder.tasks import BASELINES
 
     path = None
-    task = EVAL_TASK
+    task = BASELINES[baseline].eval_task
     if agent == "ppo":
-        task = BASELINES[baseline].eval_task
         log_dir = Path(RUNS) / BASELINES[baseline].train_task / f"seed{seed}"
         path = fl_baseline.checkpoints(log_dir)[0]
     report = fl_tracks.evaluate(
@@ -256,26 +260,35 @@ def evaluate_tracks(
     return report
 
 
+def _robot(robot: str, out: str) -> tuple[str, Path]:
+    """Baseline-name prefix and local results directory of ``robot``."""
+    if robot == "go1":
+        return "", Path(out)
+    return f"{robot}_", Path(out) / robot
+
+
 @app.local_entrypoint()
 def tracks(
     names: str = "nodr,default,wide,privileged",
     seeds: str = "0,1,2,3,4",
     agents: str = "",
     out: str = "results",
+    robot: str = "go1",
 ):
     """Score baselines and seeds (or ``agents``, e.g. zero,random) on the tracks."""
+    prefix, results = _robot(robot, out)
     jobs = [
-        (f"ppo_{name}_seed{seed}", "ppo", name, int(seed))
+        (f"ppo_{name}_seed{seed}", "ppo", prefix + name, int(seed))
         for seed in seeds.split(",")
         for name in names.split(",")
         if name
-    ] + [(agent, agent, "default", 0) for agent in agents.split(",") if agent]
+    ] + [(agent, agent, f"{prefix}default", 0) for agent in agents.split(",") if agent]
     for start in range(0, len(jobs), 8):
         batch = jobs[start : start + 8]
-        calls = [evaluate_tracks.spawn(*job) for job in batch]
+        calls = [evaluate_tracks.spawn(prefix + job[0], *job[1:]) for job in batch]
         for job, call in zip(batch, calls, strict=True):
             report = call.get()
-            path = Path(out) / job[0] / "tracks.json"
+            path = results / job[0] / "tracks.json"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(report, indent=2) + "\n")
             scores = report["scores"]
@@ -294,18 +307,20 @@ def scores(
     names: str = "nodr,default,wide,privileged,recurrent",
     seeds: str = "0,1,2,3,4",
     out: str = "results",
+    robot: str = "go1",
 ):
     """Score already trained baselines and seeds on the ladder, eight at a time."""
+    prefix, results = _robot(robot, out)
     jobs = [(name, int(seed)) for seed in seeds.split(",") for name in names.split(",")]
     for start in range(0, len(jobs), 8):
         batch = jobs[start : start + 8]
         calls = [
-            evaluate.spawn(f"ppo_{name}_seed{seed}", "ppo", name, seed)
+            evaluate.spawn(f"ppo_{prefix}{name}_seed{seed}", "ppo", prefix + name, seed)
             for name, seed in batch
         ]
         for (name, seed), call in zip(batch, calls, strict=True):
             report = call.get()
-            path = Path(out) / f"ppo_{name}_seed{seed}" / "ladder.json"
+            path = results / f"ppo_{name}_seed{seed}" / "ladder.json"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(report, indent=2) + "\n")
             print(
@@ -327,12 +342,27 @@ def ladder(
     num_envs: int = 0,
     only: str = "",
     out: str = "results",
+    robot: str = "go1",
+    weights: str = "",
 ):
-    """Score an agent on Modal and save ``<out>/<name>/ladder.json`` locally."""
+    """Score an agent on Modal and save ``<out>/<name>/ladder.json`` locally.
+
+    ``weights`` is a checkpoint file on this machine, scored as ``baseline``.
+    """
+    prefix, results = _robot(robot, out)
     report = evaluate.remote(
-        name, agent, baseline, seed, run, checkpoint, eval_seed, num_envs, only
+        prefix + name,
+        agent,
+        prefix + baseline,
+        seed,
+        run,
+        checkpoint,
+        eval_seed,
+        num_envs,
+        only,
+        Path(weights).read_bytes() if weights else b"",
     )
-    path = Path(out) / name / "ladder.json"
+    path = results / name / "ladder.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report["scores"], indent=2))
@@ -345,15 +375,18 @@ def baselines(
     seeds: str = "0,1,2",
     iterations: int = ITERATION_BUDGET,
     out: str = "results",
+    robot: str = "go1",
 ):
     """Train each baseline and seed (four jobs at a time), then score it."""
     from faultladder.tasks import BASELINES
+
+    prefix, results = _robot(robot, out)
 
     jobs = [(name, int(seed)) for seed in seeds.split(",") for name in names.split(",")]
     for start in range(0, len(jobs), 4):
         batch = jobs[start : start + 4]
         calls = [
-            train.spawn(BASELINES[name].train_task, seed, iterations)
+            train.spawn(BASELINES[prefix + name].train_task, seed, iterations)
             for name, seed in batch
         ]
         for (name, seed), call in zip(batch, calls, strict=True):
@@ -364,12 +397,12 @@ def baselines(
                 flush=True,
             )
         calls = [
-            evaluate.spawn(f"ppo_{name}_seed{seed}", "ppo", name, seed)
+            evaluate.spawn(f"ppo_{prefix}{name}_seed{seed}", "ppo", prefix + name, seed)
             for name, seed in batch
         ]
         for (name, seed), call in zip(batch, calls, strict=True):
             report = call.get()
-            path = Path(out) / f"ppo_{name}_seed{seed}" / "ladder.json"
+            path = results / f"ppo_{name}_seed{seed}" / "ladder.json"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(report, indent=2) + "\n")
             print(

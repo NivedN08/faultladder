@@ -27,7 +27,7 @@ from faultladder.evaluate import (
     sample_commands,
 )
 from faultladder.ladder import Cell
-from faultladder.tasks import EVAL_TASK
+from faultladder.tasks import EVAL_TASK, TASK_ROBOT
 
 TRACKS_VERSION = "v1"
 ONSET_SECONDS = 5.0  # the fault appears here, after the robot is walking
@@ -56,7 +56,8 @@ def evaluate(
     episode_seconds: float | None = None,
 ) -> dict[str, Any]:
     """Run both tracks and write ``tracks.json``."""
-    spec = ladder.load()
+    robot = TASK_ROBOT[task]
+    spec = ladder.load(robot)
     num_envs = int(num_envs or spec["episodes"])
     full = float(spec["episode_seconds"])
     episode_seconds = float(episode_seconds or full)
@@ -93,7 +94,7 @@ def evaluate(
     onset_cells = []
     for axis in score.MOTOR_AXES:
         for level in levels:
-            cell = ladder.cell(axis, level)
+            cell = ladder.cell(axis, level, robot)
             onset_cells.append(
                 {
                     "axis": axis,
@@ -115,14 +116,16 @@ def evaluate(
     scored = float(spec["scored_seconds"])
     nominal = run((ladder.nominal_cell(),), scored)
     singles = {
-        (axis, level): run((ladder.cell(axis, level),), scored)
+        (axis, level): run((ladder.cell(axis, level, robot),), scored)
         for axis in score.AXES
         for level in COMPOUND_LEVELS
     }
     compound_cells = []
     for level in COMPOUND_LEVELS:
         for a, b in compound_pairs():
-            result = run((ladder.cell(a, level), ladder.cell(b, level)), scored)
+            result = run(
+                (ladder.cell(a, level, robot), ladder.cell(b, level, robot)), scored
+            )
             single_a = singles[a, level]["score"]
             single_b = singles[b, level]["score"]
             compound_cells.append(
@@ -144,6 +147,7 @@ def evaluate(
     report = {
         "tracks": TRACKS_VERSION,
         "ladder": spec["version"],
+        "robot": robot,
         "task": task,
         "agent": agent,
         "baseline": baseline or agent,

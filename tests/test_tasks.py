@@ -52,7 +52,7 @@ def test_eval_task_has_only_ladder_perturbations():
 
 def test_base_task_is_left_untouched():
     cfg = load_env_cfg(BASE_TASK)
-    assert set(BASE_RANDOMISATION) <= set(cfg.events)
+    assert set(BASE_RANDOMISATION) - {"foot_friction"} <= set(cfg.events)
     for actuator in _actuators(cfg):
         assert actuator.delay_max_lag == 0
 

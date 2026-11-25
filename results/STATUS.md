@@ -42,3 +42,21 @@
   owner reviews and merges Phase 4.
 - Not done: Modal agent skill, `commit-commands` plugin, Context7
   authorisation.
+
+## After Phase 4 (2026-11-24)
+
+- Wide training fixed (payload keeps the base COM shift; pushes are in the
+  heading frame), wide and privileged retrained, all Go1 baselines at five
+  seeds. Leaderboard reports 95% confidence intervals; `results/sensitivity.md`
+  rescales the tolerances.
+- New: recurrent (LSTM) baseline, compound and onset tracks
+  (`results/tracks.md`). Teacher-student was dropped: recurrent is within
+  0.007 of privileged.
+- Phase 5: the same `ladder_v1` runs on the Unitree G1 (`--robot g1`,
+  results under `results/g1`). Four baselines, three seeds, 5,000 iterations.
+  G4 fails on `motor_calf` (a dead ankle joint still succeeds 0.74). The
+  no-randomisation G1 policy never tracks its command and scores 0.
+- Spend: project total about $87.33 at list prices (`results/spend.csv`); retried
+  jobs report only their last attempt, so the dashboard figure is higher.
+- Next step: Phase 6 release (videos, reviews, tag `v1.0.0` with the seed 0
+  default checkpoint attached, fresh-clone reproduction).

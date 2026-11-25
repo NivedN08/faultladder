@@ -17,6 +17,14 @@ BASELINES = {
     "privileged": "PPO privileged",
     "recurrent": "PPO wide, recurrent",
 }
+ROBOTS = {"go1": "Unitree Go1", "g1": "Unitree G1"}
+
+
+def robot_label(report: dict[str, Any]) -> str:
+    """The robot a run was scored on; runs from before the G1 are Go1 runs."""
+    return ROBOTS[report.get("robot", "go1")]
+
+
 # The baselines the gates are defined on; the others only join the leaderboard.
 GATE_BASELINES = ("nodr", "default", "wide", "privileged")
 COMMANDS = {
@@ -118,7 +126,8 @@ def check(results: str | Path) -> tuple[dict[str, Any], str]:
     lines = [
         "# FaultLadder validity gates",
         "",
-        f"Ladder {default['ladder']}, {default['episodes_per_cell']} episodes per "
+        f"{robot_label(default)}, ladder {default['ladder']}, "
+        f"{default['episodes_per_cell']} episodes per "
         f"cell. G1, G4 and G6 use the default policy of training seed "
         f"{default['train_seed']}; G3 and G5 use training seeds {seeds}. "
         "The seed spread in G3 is the larger of the two baselines' standard "

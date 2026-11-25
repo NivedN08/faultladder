@@ -22,7 +22,7 @@ from mjlab.utils.torch import configure_torch_backends
 
 from faultladder import events, ladder, score
 from faultladder.ladder import Cell
-from faultladder.tasks import EVAL_TASK
+from faultladder.tasks import EVAL_TASK, TASK_ROBOT
 
 AGENTS = ("ppo", "zero", "random")
 Policy = Callable[[Any], torch.Tensor]
@@ -240,11 +240,12 @@ def evaluate(
     ``task`` is the evaluation task matching the policy's observations and
     ``baseline`` the name the leaderboard groups this run under.
     """
-    spec = ladder.load()
+    robot = TASK_ROBOT[task]
+    spec = ladder.load(robot)
     num_envs = int(num_envs or spec["episodes"])
     episode_seconds = float(episode_seconds or spec["episode_seconds"])
     scored_seconds = episode_seconds * spec["scored_seconds"] / spec["episode_seconds"]
-    cells = [c for c in ladder.cells() if only is None or c.name in only]
+    cells = [c for c in ladder.cells(robot) if only is None or c.name in only]
     if not cells:
         raise ValueError(f"no ladder cell matches {only}")
     start = time.perf_counter()
@@ -279,6 +280,7 @@ def evaluate(
     env.close()
     report = {
         "ladder": spec["version"],
+        "robot": robot,
         "task": task,
         "agent": agent,
         "baseline": baseline or agent,

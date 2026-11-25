@@ -5,6 +5,8 @@ randomisation removed and the five FaultLadder event terms added, so a policy
 trained on the base task can be scored on it unchanged.
 """
 
+import inspect
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from mjlab.entity import EntityArticulationInfoCfg
@@ -13,6 +15,8 @@ from mjlab.managers.event_manager import EventTermCfg
 from mjlab.managers.observation_manager import ObservationTermCfg
 from mjlab.rl import RslRlOnPolicyRunnerCfg
 from mjlab.tasks.registry import register_mjlab_task
+from mjlab.tasks.velocity.config.g1.env_cfgs import unitree_g1_flat_env_cfg
+from mjlab.tasks.velocity.config.g1.rl_cfg import unitree_g1_ppo_runner_cfg
 from mjlab.tasks.velocity.config.go1.env_cfgs import unitree_go1_flat_env_cfg
 from mjlab.tasks.velocity.config.go1.rl_cfg import unitree_go1_ppo_runner_cfg
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
@@ -20,12 +24,24 @@ from mjlab.tasks.velocity.rl import VelocityOnPolicyRunner
 
 from faultladder import events, ladder
 
-EVAL_TASK = "FaultLadder-Eval-Unitree-Go1"
-EVAL_PRIVILEGED_TASK = "FaultLadder-Eval-Privileged-Unitree-Go1"
-EVAL_RECURRENT_TASK = "FaultLadder-Eval-Recurrent-Unitree-Go1"
 MAX_LATENCY_STEPS = 5
 # Wide randomisation covers the ladder up to this level; 4 and 5 are held out.
 WIDE_LEVEL = 3
+
+
+@dataclass(frozen=True)
+class Robot:
+    """A robot FaultLadder runs on: mjlab's flat velocity task and its PPO."""
+
+    label: str
+    env_cfg: Callable[..., ManagerBasedRlEnvCfg]
+    rl_cfg: Callable[[], RslRlOnPolicyRunnerCfg]
+
+
+ROBOTS = {
+    "go1": Robot("Unitree-Go1", unitree_go1_flat_env_cfg, unitree_go1_ppo_runner_cfg),
+    "g1": Robot("Unitree-G1", unitree_g1_flat_env_cfg, unitree_g1_ppo_runner_cfg),
+}
 
 
 @dataclass(frozen=True)
@@ -34,15 +50,20 @@ class Baseline:
 
     train_task: str
     eval_task: str
+    robot: str = "go1"
 
 
-BASELINES = {
-    "nodr": Baseline("FaultLadder-NoDR-Unitree-Go1", EVAL_TASK),
-    "default": Baseline("FaultLadder-Default-Unitree-Go1", EVAL_TASK),
-    "wide": Baseline("FaultLadder-Wide-Unitree-Go1", EVAL_TASK),
-    "privileged": Baseline("FaultLadder-Privileged-Unitree-Go1", EVAL_PRIVILEGED_TASK),
-    "recurrent": Baseline("FaultLadder-Recurrent-Unitree-Go1", EVAL_RECURRENT_TASK),
-}
+def _task(kind: str, robot: str) -> str:
+    return f"FaultLadder-{kind}-{ROBOTS[robot].label}"
+
+
+EVAL_TASK = _task("Eval", "go1")
+EVAL_PRIVILEGED_TASK = _task("Eval-Privileged", "go1")
+EVAL_RECURRENT_TASK = _task("Eval-Recurrent", "go1")
+# Go1 baselines by name; the G1's are prefixed, e.g. ``g1_wide``.
+BASELINES: dict[str, Baseline] = {}
+# The robot each registered FaultLadder task runs.
+TASK_ROBOT: dict[str, str] = {}
 # Randomisation the base task applies itself; evaluation holds these fixed.
 BASE_RANDOMISATION = (
     "push_robot",
@@ -51,6 +72,7 @@ BASE_RANDOMISATION = (
     "foot_friction_roll",
     "encoder_bias",
     "base_com",
+    "foot_friction",
 )
 
 
@@ -72,10 +94,11 @@ def _delay_buffers(cfg: ManagerBasedRlEnvCfg, max_steps: int) -> None:
     )
 
 
-def add_ladder_events(cfg: ManagerBasedRlEnvCfg) -> None:
+def add_ladder_events(cfg: ManagerBasedRlEnvCfg, robot: str = "go1") -> None:
     """Add the FaultLadder event terms, all at their nominal values."""
-    spec = ladder.load()
+    spec = ladder.load(robot)
     params = ladder.event_params(ladder.nominal_cell())
+    params[ladder.PAYLOAD]["max_offset"] = spec["payload_max_offset"]
     # mjlab fires an interval event on the first step after its timer runs
     # out, so half a control step less makes it fire exactly on the interval.
     interval = (
@@ -98,11 +121,13 @@ def add_ladder_events(cfg: ManagerBasedRlEnvCfg) -> None:
     _delay_buffers(cfg, MAX_LATENCY_STEPS)
 
 
-def faultladder_eval_env_cfg(privileged: bool = False) -> ManagerBasedRlEnvCfg:
-    """The Go1 flat task with one fixed command per episode and no base DR."""
-    cfg = unitree_go1_flat_env_cfg()
+def faultladder_eval_env_cfg(
+    privileged: bool = False, robot: str = "go1"
+) -> ManagerBasedRlEnvCfg:
+    """The flat task with one fixed command per episode and no base DR."""
+    cfg = ROBOTS[robot].env_cfg()
     for name in BASE_RANDOMISATION:
-        del cfg.events[name]
+        cfg.events.pop(name, None)
     cfg.curriculum = {}
     # The evaluator ends episodes itself and writes one command per episode.
     cfg.episode_length_s = 1.0e6
@@ -113,7 +138,7 @@ def faultladder_eval_env_cfg(privileged: bool = False) -> ManagerBasedRlEnvCfg:
     twist.rel_heading_envs = 0.0
     twist.heading_command = False
     twist.ranges.heading = None
-    add_ladder_events(cfg)
+    add_ladder_events(cfg, robot)
     if privileged:
         _add_fault_observation(cfg)
     return cfg
@@ -126,24 +151,26 @@ def _add_fault_observation(cfg: ManagerBasedRlEnvCfg) -> None:
         )
 
 
-def no_randomisation_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+def no_randomisation_env_cfg(
+    play: bool = False, robot: str = "go1"
+) -> ManagerBasedRlEnvCfg:
     """The base task with its randomisation events removed."""
-    cfg = unitree_go1_flat_env_cfg(play=play)
+    cfg = ROBOTS[robot].env_cfg(play=play)
     for name in BASE_RANDOMISATION:
         cfg.events.pop(name, None)
     return cfg
 
 
 def wide_randomisation_env_cfg(
-    play: bool = False, privileged: bool = False
+    play: bool = False, privileged: bool = False, robot: str = "go1"
 ) -> ManagerBasedRlEnvCfg:
     """The base task with randomisation widened to level 3 of every axis.
 
-    Friction needs no change: the base task already draws 0.3 to 1.5, and
+    Friction needs no change: the base tasks already draw from 0.3 up, and
     level 3 is 0.3. ``privileged`` also shows the policy the fault parameters.
     """
-    cfg = unitree_go1_flat_env_cfg(play=play)
-    spec = ladder.load()
+    cfg = ROBOTS[robot].env_cfg(play=play)
+    spec = ladder.load(robot)
     top = {
         axis: entry["levels"][WIDE_LEVEL - 1] for axis, entry in spec["axes"].items()
     }
@@ -183,13 +210,13 @@ def wide_randomisation_env_cfg(
     return cfg
 
 
-def recurrent_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
-    """The Go1 PPO settings with an LSTM in front of the actor and the critic.
+def recurrent_ppo_runner_cfg(robot: str = "go1") -> RslRlOnPolicyRunnerCfg:
+    """The robot's PPO settings with an LSTM in front of the actor and the critic.
 
     A policy with memory can infer a fault from how the robot has responded,
     which a policy that sees one time step cannot.
     """
-    cfg = unitree_go1_ppo_runner_cfg()
+    cfg = ROBOTS[robot].rl_cfg()
     for model in (cfg.actor, cfg.critic):
         model.class_name = "RNNModel"
         model.rnn_type = "lstm"
@@ -198,53 +225,57 @@ def recurrent_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
     return cfg
 
 
+def _default_env_cfg(play: bool = False, robot: str = "go1") -> ManagerBasedRlEnvCfg:
+    return ROBOTS[robot].env_cfg(play=play)
+
+
 def _register(
-    task_id: str, env_cfg, play_env_cfg, rl_cfg: RslRlOnPolicyRunnerCfg | None = None
-) -> None:
+    kind: str,
+    robot: str,
+    env_cfg: Callable[..., ManagerBasedRlEnvCfg],
+    recurrent: bool = False,
+    **kwargs: bool,
+) -> str:
+    """Register a task; training tasks also get mjlab's play variant."""
+    task_id = _task(kind, robot)
+    play = {"play": True} if "play" in inspect.signature(env_cfg).parameters else {}
     register_mjlab_task(
         task_id=task_id,
-        env_cfg=env_cfg,
-        play_env_cfg=play_env_cfg,
-        rl_cfg=rl_cfg or unitree_go1_ppo_runner_cfg(),
+        env_cfg=env_cfg(robot=robot, **kwargs),
+        play_env_cfg=env_cfg(robot=robot, **kwargs, **play),
+        rl_cfg=recurrent_ppo_runner_cfg(robot) if recurrent else ROBOTS[robot].rl_cfg(),
         runner_cls=VelocityOnPolicyRunner,
     )
+    TASK_ROBOT[task_id] = robot
+    return task_id
 
 
-_register(EVAL_TASK, faultladder_eval_env_cfg(), faultladder_eval_env_cfg())
-_register(
-    EVAL_PRIVILEGED_TASK,
-    faultladder_eval_env_cfg(privileged=True),
-    faultladder_eval_env_cfg(privileged=True),
-)
-_register(
-    BASELINES["nodr"].train_task,
-    no_randomisation_env_cfg(),
-    no_randomisation_env_cfg(play=True),
-)
-_register(
-    BASELINES["default"].train_task,
-    unitree_go1_flat_env_cfg(),
-    unitree_go1_flat_env_cfg(play=True),
-)
-_register(
-    BASELINES["wide"].train_task,
-    wide_randomisation_env_cfg(),
-    wide_randomisation_env_cfg(play=True),
-)
-_register(
-    BASELINES["privileged"].train_task,
-    wide_randomisation_env_cfg(privileged=True),
-    wide_randomisation_env_cfg(play=True, privileged=True),
-)
-_register(
-    EVAL_RECURRENT_TASK,
-    faultladder_eval_env_cfg(),
-    faultladder_eval_env_cfg(),
-    recurrent_ppo_runner_cfg(),
-)
-_register(
-    BASELINES["recurrent"].train_task,
-    wide_randomisation_env_cfg(),
-    wide_randomisation_env_cfg(play=True),
-    recurrent_ppo_runner_cfg(),
-)
+for _robot in ROBOTS:
+    _prefix = "" if _robot == "go1" else f"{_robot}_"
+    _eval = _register("Eval", _robot, faultladder_eval_env_cfg)
+    _eval_privileged = _register(
+        "Eval-Privileged", _robot, faultladder_eval_env_cfg, privileged=True
+    )
+    _eval_recurrent = _register(
+        "Eval-Recurrent", _robot, faultladder_eval_env_cfg, recurrent=True
+    )
+    _wide = wide_randomisation_env_cfg
+    BASELINES |= {
+        f"{_prefix}nodr": Baseline(
+            _register("NoDR", _robot, no_randomisation_env_cfg), _eval, _robot
+        ),
+        f"{_prefix}default": Baseline(
+            _register("Default", _robot, _default_env_cfg), _eval, _robot
+        ),
+        f"{_prefix}wide": Baseline(_register("Wide", _robot, _wide), _eval, _robot),
+        f"{_prefix}privileged": Baseline(
+            _register("Privileged", _robot, _wide, privileged=True),
+            _eval_privileged,
+            _robot,
+        ),
+        f"{_prefix}recurrent": Baseline(
+            _register("Recurrent", _robot, _wide, recurrent=True),
+            _eval_recurrent,
+            _robot,
+        ),
+    }
